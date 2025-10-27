@@ -133,7 +133,6 @@ def main():
         console.print("\n[+] Generating reports...")
         output.save_json_output(results, output_dir)
         summary = output.generate_summary(results)
-        output.save_text_summary(summary, output_dir)
         if args.html:
             output.save_html_report(results, output_dir)
 

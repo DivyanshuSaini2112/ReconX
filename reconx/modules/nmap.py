@@ -14,7 +14,7 @@ class NmapScanner:
         base_cmd = f'nmap -oX {self.output_file} {self.target}'
 
         profile_args = {
-            'fast': '-T4 -F',
+            'fast': '-T4 -F -sV --version-light',
             'default': '-T4 -sV -sC',
             'deep': '-T4 -sV -sC -p- -A'
         }
