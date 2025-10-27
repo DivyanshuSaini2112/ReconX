@@ -10,15 +10,16 @@ class SubdomainScanner:
     def get_command(self):
         return ['subfinder', '-d', self.target, '-o', self.output_file]
 
-    def run_scan(self):
+    def run_scan(self, timeout=None):
         command = self.get_command()
-        print(f"[*] Running Subfinder scan: {' '.join(command)}")
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            print("[+] Subdomain enumeration completed.")
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
             print("[!] Error: 'subfinder' command not found. Make sure it's installed and in your PATH.")
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"[!] Subfinder scan timed out after {timeout} seconds.")
             return None
         except subprocess.CalledProcessError as e:
             print(f"[!] Error running Subfinder: {e.stderr}")

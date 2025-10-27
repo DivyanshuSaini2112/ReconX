@@ -1,0 +1,27 @@
+{
+    "commandline": "ffuf -u http://example.com/FUZZ -w /path/to/wordlist.txt -of json -o sample_ffuf.json",
+    "results": [
+        {
+            "input": {
+                "FUZZ": "admin"
+            },
+            "position": 0,
+            "status": 302,
+            "length": 28,
+            "words": 6,
+            "lines": 2,
+            "url": "http://example.com/admin"
+        },
+        {
+            "input": {
+                "FUZZ": "images"
+            },
+            "position": 1,
+            "status": 200,
+            "length": 4096,
+            "words": 78,
+            "lines": 52,
+            "url": "http://example.com/images"
+        }
+    ]
+}

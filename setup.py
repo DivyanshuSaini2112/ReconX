@@ -7,6 +7,10 @@ setup(
     author_email='',
     description='A CLI-first reconnaissance tool for Kali Linux',
     packages=find_packages(),
+    install_requires=[
+        'rich',
+        'openai',
+    ],
     entry_points={
         'console_scripts': [
             'reconx = reconx.__main__:main'

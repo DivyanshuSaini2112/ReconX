@@ -18,15 +18,16 @@ class DirectoryFuzzer:
 
         return base_cmd.split()
 
-    def run_scan(self):
+    def run_scan(self, timeout=None):
         command = self.get_command()
-        print(f"[*] Running Gobuster scan: {' '.join(command)}")
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            print("[+] Directory fuzzing completed.")
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
             print("[!] Error: 'gobuster' command not found. Make sure it's installed and in your PATH.")
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"[!] Gobuster scan timed out after {timeout} seconds.")
             return None
         except subprocess.CalledProcessError as e:
             # Gobuster exits with a non-zero status code on some errors (e.g., DNS), so we check stderr

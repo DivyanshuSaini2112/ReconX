@@ -15,13 +15,15 @@ ReconX is designed to run on Kali Linux and relies on the following tools being 
 - [Nmap](https://nmap.org/)
 - [Subfinder](https://github.com/projectdiscovery/subfinder)
 - [Gobuster](https://github.com/OJ/gobuster)
+- [ffuf](https://github.com/ffuf/ffuf)
 - [WhatWeb](https://github.com/urbanadventurer/WhatWeb)
 - [Nikto](https://github.com/sullo/nikto)
+- [SQLMap](https://sqlmap.org/)
 
 You can install these tools on Kali Linux using the following command:
 
 ```bash
-sudo apt-get update && sudo apt-get install nmap subfinder gobuster whatweb nikto
+sudo apt-get update && sudo apt-get install nmap subfinder gobuster ffuf whatweb nikto sqlmap
 ```
 
 ### Installation from Source
@@ -40,8 +42,9 @@ sudo apt-get update && sudo apt-get install nmap subfinder gobuster whatweb nikt
 ## Usage
 
 ```
-usage: reconx [-h] -t TARGET [--modules MODULES] [--profile {fast,default,deep}] [--threads THREADS] [--wordlist WORDLIST] [--out OUT]
-              [--nmap-args NMAP_ARGS] [--gobuster-args GOBUSTER_ARGS] [--sqlmap] [--no-exec]
+usage: reconx [-h] -t TARGET [--modules MODULES] [--profile {fast,default,deep}] [--threads THREADS] [--wordlist WORDLIST]
+              [--fuzzer {gobuster,ffuf}] [--out OUT] [--html] [--ai-summary] [--nmap-args NMAP_ARGS]
+              [--gobuster-args GOBUSTER_ARGS] [--ffuf-args FFuf_ARGS] [--sqlmap] [--no-exec]
 
 A CLI-first reconnaissance tool for Kali Linux.
 
@@ -54,30 +57,36 @@ optional arguments:
                         Scan profile (fast, default, deep).
   --threads THREADS     Number of concurrent threads for fuzzing/discovery.
   --wordlist WORDLIST   Path to a custom wordlist for directory fuzzing.
+  --fuzzer {gobuster,ffuf}
+                        Choose the directory fuzzer to use.
   --out OUT             Directory to save results to.
+  --html                Generate an HTML report.
+  --ai-summary          Generate a summary using an AI model (requires OPENAI_API_KEY).
   --nmap-args NMAP_ARGS
-                        Custom arguments for Nmap (e.g., "--nmap-args='-sV -T4'").
+                        Custom arguments for Nmap.
   --gobuster-args GOBUSTER_ARGS
-                        Custom arguments for Gobuster/dirsearch.
+                        Custom arguments for Gobuster.
+  --ffuf-args FFuf_ARGS
+                        Custom arguments for ffuf.
   --sqlmap              Explicitly enable the SQLMap module.
   --no-exec             Print planned commands without executing them.
 
-Example: reconx -t example.com --profile default --modules nmap,subenum,dirfuzz,nikto,whatweb
+Example: reconx -t example.com --profile default --modules nmap,subenum,dirfuzz --fuzzer ffuf --html --ai-summary
 ```
 
 ### Example Run
 
 ```bash
-reconx -t example.com --profile default --modules nmap,subenum,dirfuzz,nikto --wordlist /usr/share/wordlists/dirb/common.txt --out ./results
+reconx -t example.com --profile default --modules nmap,subenum,dirfuzz,nikto --wordlist /usr/share/wordlists/dirb/common.txt --out ./results --fuzzer ffuf --html
 ```
 
 This command will:
 
 1.  Run an Nmap scan with the `default` profile.
 2.  Enumerate subdomains using Subfinder.
-3.  Fuzz for directories using Gobuster with the `common.txt` wordlist.
+3.  Fuzz for directories using `ffuf` with the `common.txt` wordlist.
 4.  Run a Nikto scan to identify web server vulnerabilities.
-5.  Save all results to the `./results/example.com-<timestamp>` directory.
+5.  Save all results to the `./results/example.com-<timestamp>` directory, including an HTML report.
 
 ## Output
 
@@ -85,6 +94,7 @@ ReconX produces the following outputs in a timestamped directory:
 
 -   `reconx_results.json`: A JSON file containing all the aggregated results.
 -   `summary.txt`: A human-readable "Initial Attack Vector Summary."
+-   `report.html`: An HTML report of the findings (if `--html` is specified).
 -   Raw output files from each of the tools (`nmap_scan.xml`, `subdomains.txt`, etc.).
 
 ## License

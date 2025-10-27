@@ -11,15 +11,16 @@ class NiktoScanner:
         # We use -o to specify the output file, and -Format txt is the default
         return ['nikto', '-h', self.target, '-o', self.output_file, '-Format', 'txt']
 
-    def run_scan(self):
+    def run_scan(self, timeout=None):
         command = self.get_command()
-        print(f"[*] Running Nikto scan: {' '.join(command)}")
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            print("[+] Nikto scan completed.")
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
             print("[!] Error: 'nikto' command not found. Make sure it's installed and in your PATH.")
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"[!] Nikto scan timed out after {timeout} seconds.")
             return None
         except subprocess.CalledProcessError as e:
             # Nikto often exits with a non-zero status code, so we'll parse the output anyway
