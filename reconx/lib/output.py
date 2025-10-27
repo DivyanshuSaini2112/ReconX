@@ -11,107 +11,74 @@ def save_json_output(data, output_dir):
     except (IOError, TypeError) as e:
         print(f"[!] Error saving JSON output: {e}")
 
+from rich.table import Table
+from rich.console import Group
+
 def generate_summary(data):
-    """Generates the Initial Attack Vector Summary."""
-    summary = "--- Initial Attack Vector Summary ---\n\n"
+    """Generates the Initial Attack Vector Summary using rich Tables."""
+    renderables = []
     action_list = []
 
     # Nmap results
-    if 'nmap' in data and data['nmap']:
-        summary += "## Open Ports & Services\n"
+    if 'nmap' in data and data.get('nmap'):
+        table = Table(title="Open Ports & Services", style="cyan")
+        table.add_column("Host", style="magenta")
+        table.add_column("Port", style="green")
+        table.add_column("Service")
+        table.add_column("Version")
         for host in data['nmap']:
-            summary += f"### Host: {host['ip']}\n"
             for port in host['ports']:
                 if port['state'] == 'open':
                     service = port.get('service', {})
                     product = service.get('product') or ''
                     version = service.get('version') or ''
                     service_info = f"{product} {version}".strip()
-                    summary += f"- **Port {port['portid']}/{port['protocol']}:** {service.get('name', 'unknown')} ({service_info})\n"
+                    table.add_row(host['ip'], f"{port['portid']}/{port['protocol']}", service.get('name', 'unknown'), service_info)
                     if port['portid'] in ['80', '443', '8080']:
                         action_list.append(f"Investigate web application on port {port['portid']}.")
-                    if 'ssh' in service.get('name', ''):
-                        action_list.append(f"Check for weak SSH credentials on port {port['portid']}.")
-        summary += "\n"
+        renderables.append(table)
 
     # WhatWeb results
-    if 'whatweb' in data and data['whatweb']:
-        summary += "## Web Technologies\n"
+    if 'whatweb' in data and data.get('whatweb'):
+        table = Table(title="Web Technologies", style="cyan")
+        table.add_column("Target", style="magenta")
+        table.add_column("Technology", style="green")
+        table.add_column("Details")
         for tech in data['whatweb']:
-            target = tech.get('target', 'Unknown Target')
-            summary += f"### Target: {target}\n"
-            plugins = tech.get('plugins', {})
-            for plugin, info in plugins.items():
+            for plugin, info in tech.get('plugins', {}).items():
                 details = []
                 if 'version' in info and info['version']:
                     details.append(f"Version: {', '.join(map(str, info['version']))}")
                 if 'string' in info and info['string']:
                     details.append(f"Info: {', '.join(map(str, info['string']))}")
-
-                summary += f"- **{plugin}:** {' | '.join(details)}\n"
-                if 'version' in info and info['version']:
-                    action_list.append(f"Research vulnerabilities for {plugin} version {info['version'][0]}.")
-        summary += "\n"
+                table.add_row(tech.get('target'), plugin, ' | '.join(details))
+        renderables.append(table)
 
     # Subdomain results
-    if 'subdomains' in data:
-        summary += "## Discovered Subdomains\n"
-        if data['subdomains']:
-            for sub in data['subdomains']:
-                summary += f"- {sub}\n"
-        else:
-            summary += "No subdomains found.\n"
-        summary += "\n"
+    if 'subenum' in data and data.get('subenum'):
+        table = Table(title="Discovered Subdomains (Passive)", style="cyan")
+        table.add_column("Subdomain", style="green")
+        for sub in data['subenum']:
+            table.add_row(sub)
+        renderables.append(table)
 
-    # Directory fuzzing results
-    if 'directories' in data:
-        summary += "## Interesting Directories/Files\n"
-        if data['directories']:
-            for directory in data['directories'][:10]:
-                summary += f"- {directory}\n"
-                if any(admin_path in directory for admin_path in ['/admin', '/dashboard', '/login']):
-                     action_list.append(f"Manually investigate sensitive path: {directory}")
-            if len(data['directories']) > 10:
-                summary += "- ... and more.\n"
-        else:
-            summary += "No interesting directories found.\n"
-        summary += "\n"
+    if 'subfuzz' in data and data.get('subfuzz'):
+        table = Table(title="Discovered Subdomains (Bruteforce)", style="cyan")
+        table.add_column("Subdomain", style="green")
+        for sub in data['subfuzz']:
+            table.add_row(sub)
+        renderables.append(table)
 
-    # Nikto findings
-    if 'nikto' in data:
-        summary += "## Nikto Findings\n"
-        if data['nikto']:
-            for finding in data['nikto'][:10]:
-                summary += f"- {finding}\n"
-                if 'OSVDB-3233' in finding: # Apache default file
-                    action_list.append("Review Apache default files for information disclosure.")
-            if len(data['nikto']) > 10:
-                summary += "- ... and more.\n"
-        else:
-            summary += "No significant findings from Nikto scan.\n"
-        summary += "\n"
-
-    # SQLMap results
-    if 'sqlmap' in data and data['sqlmap']:
-        summary += "## SQL Injection\n"
-        if data['sqlmap'].get('vulnerable'):
-            summary += "- **Potential SQL injection found!**\n"
-            for vuln in data['sqlmap'].get('vulnerabilities', []):
-                summary += f"  - {vuln}\n"
-            action_list.insert(0, "CRITICAL: Investigate and confirm potential SQL injection.")
-        else:
-            summary += "- No obvious SQL injection points found with initial scan.\n"
-        summary += "\n"
-
-
-    summary += "## Prioritized Action List\n"
+    # Action List
     if action_list:
-        for i, action in enumerate(action_list[:8], 1): # Limit to top 8
-            summary += f"{i}. {action}\n"
-    else:
-        summary += "No high-priority actions identified from the automated scan.\n"
+        table = Table(title="Prioritized Action List", style="yellow")
+        table.add_column("Step", style="magenta")
+        table.add_column("Action")
+        for i, action in enumerate(action_list[:8], 1):
+            table.add_row(str(i), action)
+        renderables.append(table)
 
-    return summary
+    return Group(*renderables)
 
 def save_text_summary(summary, output_dir):
     """Saves the text summary to a file."""
@@ -133,7 +100,7 @@ def generate_ai_summary(data):
         return None
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.0-pro')
 
     prompt = f"""
     As a senior penetration tester, analyze the following reconnaissance data. Provide a brief, actionable summary for a client.
