@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Results
+results/
+
+# Test artifacts
+tests/tmp/

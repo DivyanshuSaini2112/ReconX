@@ -1,0 +1,6 @@
+- Nikto v2.1.6
+---------------------------------------------------------------------------
++ Server: Apache/2.4.41 (Ubuntu)
++ The anti-clickjacking X-Frame-Options header is not present.
++ OSVDB-3233: /icons/readme: Apache default file found.
+---------------------------------------------------------------------------
