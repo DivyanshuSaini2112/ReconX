@@ -18,14 +18,11 @@ class WhatWebScanner:
             subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
-            print("[!] Error: 'whatweb' command not found. Make sure it's installed and in your PATH.")
-            return None
+            return {'error': "'whatweb' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            print(f"[!] WhatWeb scan timed out after {timeout} seconds.")
-            return None
+            return {'error': f"WhatWeb scan timed out after {timeout} seconds."}
         except subprocess.CalledProcessError as e:
-            print(f"[!] Error running WhatWeb: {e.stderr}")
-            return None
+            return {'error': f"Error running WhatWeb: {e.stderr}"}
 
     def parse_results(self):
         try:

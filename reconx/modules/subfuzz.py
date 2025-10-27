@@ -2,25 +2,18 @@ import subprocess
 import os
 import json
 
-class FfufFuzzer:
+class SubdomainFuzzer:
     def __init__(self, target, wordlist, threads, output_dir, ffuf_args=''):
-        if not target.startswith(('http://', 'https://')):
-            self.target = f"http://{target}"
-        else:
-            self.target = target
-        self.wordlist = wordlist if wordlist else '/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt'
+        self.target = target
+        self.wordlist = wordlist if wordlist else '/usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-5000.txt'
         self.threads = threads
         self.output_dir = output_dir
         self.ffuf_args = ffuf_args
-        self.output_file = os.path.join(self.output_dir, 'ffuf_fuzz.json')
+        self.output_file = os.path.join(self.output_dir, 'subfuzz.json')
 
     def get_command(self):
-        # Use FUZZ keyword for ffuf
-        url = self.target if self.target.endswith('/') else self.target + '/'
-        url += 'FUZZ'
-
-        # We use -o to specify the output file and -of json for the format
-        base_cmd = f'ffuf -u {url} -w {self.wordlist} -t {self.threads} -o {self.output_file} -of json'
+        # Use FUZZ keyword as a placeholder for the subdomain in the Host header
+        base_cmd = f'ffuf -u http://{self.target} -w {self.wordlist} -H "Host: FUZZ.{self.target}" -t {self.threads} -o {self.output_file} -of json'
 
         if self.ffuf_args:
             base_cmd += f' {self.ffuf_args}'
@@ -35,20 +28,20 @@ class FfufFuzzer:
         except FileNotFoundError:
             return {'error': "'ffuf' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            return {'error': f"ffuf scan timed out after {timeout} seconds."}
+            return {'error': f"Subdomain fuzzing timed out after {timeout} seconds."}
         except subprocess.CalledProcessError as e:
-            return {'error': f"Error running ffuf: {e.stderr}"}
+            return {'error': f"Error running ffuf for subdomain fuzzing: {e.stderr}"}
 
     def parse_results(self):
         try:
             with open(self.output_file, 'r') as f:
                 data = json.load(f)
-            # Extract the value of the 'FUZZ' keyword from the 'input' dictionary
+            # Extract the 'input' which is the subdomain that was found
             return [result['input']['FUZZ'] for result in data.get('results', [])]
         except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-            print(f"[!] Error parsing ffuf JSON output: {e}")
+            print(f"[!] Error parsing ffuf JSON output for subdomain fuzzing: {e}")
             return None
 
 def run(target, wordlist, threads, output_dir, ffuf_args):
-    fuzzer = FfufFuzzer(target, wordlist, threads, output_dir, ffuf_args)
+    fuzzer = SubdomainFuzzer(target, wordlist, threads, output_dir, ffuf_args)
     return fuzzer.run_scan()
