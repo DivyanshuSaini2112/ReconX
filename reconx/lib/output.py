@@ -1,6 +1,5 @@
 import json
 import os
-import google.generativeai as genai
 from rich.table import Table
 from rich.console import Group
 from rich.text import Text
