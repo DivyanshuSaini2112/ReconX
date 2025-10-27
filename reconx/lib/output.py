@@ -107,15 +107,10 @@ def save_text_summary(data, output_dir):
         print(f"[!] Error saving text summary: {e}")
 
 
+import ollama
+
 def generate_ai_summary(data):
-    """Generates a summary using the Google Gemini Pro model."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return "[bold red]GEMINI_API_KEY environment variable not set. Skipping AI summary.[/bold red]"
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.0-pro')
-
+    """Generates a summary using a local Ollama model."""
     prompt = f"""
     As a senior penetration tester, analyze the following reconnaissance data. Provide a brief, actionable summary for a client.
     Focus on the most critical findings and suggest the top 3-5 immediate next steps.
@@ -125,10 +120,13 @@ def generate_ai_summary(data):
     """
 
     try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        response = ollama.chat(
+            model='llama3',
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        return response['message']['content'].strip()
     except Exception as e:
-        return f"[bold red]Error generating AI summary with Gemini Pro: {e}[/bold red]"
+        return f"[bold red]Error generating AI summary with Ollama: {e}. Is the Ollama server running?[/bold red]"
 
 def save_html_report(data, output_dir):
     """Generates and saves a self-contained HTML report."""

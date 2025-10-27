@@ -39,6 +39,17 @@ sudo apt-get update && sudo apt-get install nmap subfinder gobuster ffuf whatweb
     pip install .
     ```
 
+### AI Summary Setup (Optional)
+
+The `--ai-summary` feature uses a local AI model through [Ollama](https://ollama.ai/). This is **100% free, private, and works offline.**
+
+1.  **Install Ollama:** Follow the official instructions to download and install Ollama on your system.
+2.  **Download a Model:** Pull a model for the summary generation. `llama3` is recommended:
+    ```bash
+    ollama pull llama3
+    ```
+3.  **Run the Ollama Server:** Before using the `--ai-summary` flag, make sure the Ollama server is running in the background.
+
 ## Usage
 
 ```
@@ -61,7 +72,7 @@ optional arguments:
                         Choose the directory fuzzer to use.
   --out OUT             Directory to save results to.
   --html                Generate an HTML report.
-  --ai-summary          Generate a summary using an AI model (requires OPENAI_API_KEY).
+  --ai-summary          Generate a summary using a local Ollama model.
   --nmap-args NMAP_ARGS
                         Custom arguments for Nmap.
   --gobuster-args GOBUSTER_ARGS
@@ -74,26 +85,12 @@ optional arguments:
 Example: reconx -t example.com --profile default --modules nmap,subenum,dirfuzz --fuzzer ffuf --html --ai-summary
 ```
 
-### Example Run
-
-```bash
-reconx -t example.com --profile default --modules nmap,subenum,dirfuzz,nikto --wordlist /usr/share/wordlists/dirb/common.txt --out ./results --fuzzer ffuf --html
-```
-
-This command will:
-
-1.  Run an Nmap scan with the `default` profile.
-2.  Enumerate subdomains using Subfinder.
-3.  Fuzz for directories using `ffuf` with the `common.txt` wordlist.
-4.  Run a Nikto scan to identify web server vulnerabilities.
-5.  Save all results to the `./results/example.com-<timestamp>` directory, including an HTML report.
-
 ## Output
 
 ReconX produces the following outputs in a timestamped directory:
 
 -   `reconx_results.json`: A JSON file containing all the aggregated results.
--   `summary.txt`: A human-readable "Initial Attack Vector Summary."
+-   `summary.txt`: A plain-text summary of the findings.
 -   `report.html`: An HTML report of the findings (if `--html` is specified).
 -   Raw output files from each of the tools (`nmap_scan.xml`, `subdomains.txt`, etc.).
 

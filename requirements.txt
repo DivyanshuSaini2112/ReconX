@@ -1,2 +1,2 @@
 rich
-google-generativeai
+ollama
