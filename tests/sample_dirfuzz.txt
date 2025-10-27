@@ -1,0 +1,3 @@
+/admin (Status: 301)
+/images (Status: 200)
+/css (Status: 200)

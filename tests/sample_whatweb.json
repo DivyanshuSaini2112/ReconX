@@ -1,0 +1,16 @@
+[
+  {
+    "target": "http://example.com",
+    "http_status": 200,
+    "plugins": {
+      "Apache": {
+        "version": ["2.4.41"],
+        "os": ["Ubuntu"]
+      },
+      "HTML5": {},
+      "Title": {
+        "string": ["Example Domain"]
+      }
+    }
+  }
+]
