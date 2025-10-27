@@ -1,5 +1,9 @@
 import json
 import os
+import google.generativeai as genai
+from rich.table import Table
+from rich.console import Group
+from rich.text import Text
 
 def save_json_output(data, output_dir):
     """Saves the aggregated results to a JSON file."""
@@ -11,9 +15,6 @@ def save_json_output(data, output_dir):
     except (IOError, TypeError) as e:
         print(f"[!] Error saving JSON output: {e}")
 
-from rich.table import Table
-from rich.console import Group
-
 def generate_summary(data):
     """Generates the Initial Attack Vector Summary using rich Tables."""
     renderables = []
@@ -21,9 +22,9 @@ def generate_summary(data):
 
     # Nmap results
     if 'nmap' in data and data.get('nmap'):
-        table = Table(title="Open Ports & Services", style="cyan")
-        table.add_column("Host", style="magenta")
-        table.add_column("Port", style="green")
+        table = Table(title="Open Ports & Services", style="cyan", title_style="bold cyan")
+        table.add_column("Host", style="bold magenta")
+        table.add_column("Port", style="yellow")
         table.add_column("Service")
         table.add_column("Version")
         for host in data['nmap']:
@@ -33,15 +34,16 @@ def generate_summary(data):
                     product = service.get('product') or ''
                     version = service.get('version') or ''
                     service_info = f"{product} {version}".strip()
-                    table.add_row(host['ip'], f"{port['portid']}/{port['protocol']}", service.get('name', 'unknown'), service_info)
+                    port_style = "bold red" if port['portid'] in ['80', '443', '8080'] else "yellow"
+                    table.add_row(host['ip'], Text(f"{port['portid']}/{port['protocol']}", style=port_style), service.get('name', 'unknown'), service_info)
                     if port['portid'] in ['80', '443', '8080']:
                         action_list.append(f"Investigate web application on port {port['portid']}.")
         renderables.append(table)
 
     # WhatWeb results
     if 'whatweb' in data and data.get('whatweb'):
-        table = Table(title="Web Technologies", style="cyan")
-        table.add_column("Target", style="magenta")
+        table = Table(title="Web Technologies", style="cyan", title_style="bold cyan")
+        table.add_column("Target", style="bold magenta")
         table.add_column("Technology", style="green")
         table.add_column("Details")
         for tech in data['whatweb']:
@@ -56,14 +58,14 @@ def generate_summary(data):
 
     # Subdomain results
     if 'subenum' in data and data.get('subenum'):
-        table = Table(title="Discovered Subdomains (Passive)", style="cyan")
+        table = Table(title="Discovered Subdomains (Passive)", style="cyan", title_style="bold cyan")
         table.add_column("Subdomain", style="green")
         for sub in data['subenum']:
             table.add_row(sub)
         renderables.append(table)
 
     if 'subfuzz' in data and data.get('subfuzz'):
-        table = Table(title="Discovered Subdomains (Bruteforce)", style="cyan")
+        table = Table(title="Discovered Subdomains (Bruteforce)", style="cyan", title_style="bold cyan")
         table.add_column("Subdomain", style="green")
         for sub in data['subfuzz']:
             table.add_row(sub)
@@ -71,7 +73,7 @@ def generate_summary(data):
 
     # Action List
     if action_list:
-        table = Table(title="Prioritized Action List", style="yellow")
+        table = Table(title="Prioritized Action List", style="yellow", title_style="bold yellow")
         table.add_column("Step", style="magenta")
         table.add_column("Action")
         for i, action in enumerate(action_list[:8], 1):
@@ -80,8 +82,22 @@ def generate_summary(data):
 
     return Group(*renderables)
 
-def save_text_summary(summary, output_dir):
-    """Saves the text summary to a file."""
+def save_text_summary(data, output_dir):
+    """Saves a plain text summary to a file."""
+    summary = "--- Initial Attack Vector Summary ---\n\n"
+    # A simplified text version of the rich summary
+    if 'nmap' in data and data.get('nmap'):
+        summary += "## Open Ports & Services\n"
+        for host in data['nmap']:
+            for port in host['ports']:
+                 if port['state'] == 'open':
+                    service = port.get('service', {})
+                    product = service.get('product') or ''
+                    version = service.get('version') or ''
+                    service_info = f"{product} {version}".strip()
+                    summary += f"- {host['ip']}:{port['portid']}/{port['protocol']} - {service.get('name', 'unknown')} ({service_info})\n"
+        summary += "\n"
+
     output_file = os.path.join(output_dir, 'summary.txt')
     try:
         with open(output_file, 'w') as f:
@@ -90,14 +106,12 @@ def save_text_summary(summary, output_dir):
     except IOError as e:
         print(f"[!] Error saving text summary: {e}")
 
-import google.generativeai as genai
 
 def generate_ai_summary(data):
     """Generates a summary using the Google Gemini Pro model."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        print("[!] GEMINI_API_KEY environment variable not set. Skipping AI summary.")
-        return None
+        return "[bold red]GEMINI_API_KEY environment variable not set. Skipping AI summary.[/bold red]"
 
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.0-pro')
@@ -114,8 +128,7 @@ def generate_ai_summary(data):
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        print(f"[!] Error generating AI summary with Gemini Pro: {e}")
-        return None
+        return f"[bold red]Error generating AI summary with Gemini Pro: {e}[/bold red]"
 
 def save_html_report(data, output_dir):
     """Generates and saves a self-contained HTML report."""
@@ -142,7 +155,7 @@ def save_html_report(data, output_dir):
             <h1>ReconX Scan Report</h1>
     """
 
-    if 'nmap' in data:
+    if 'nmap' in data and data.get('nmap'):
         html += '<div class="module"><h2>Nmap Results</h2>'
         for host in data['nmap']:
             html += f"<h3>Host: {host['ip']}</h3><table><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>Version</th></tr>"
@@ -153,43 +166,36 @@ def save_html_report(data, output_dir):
             html += "</table>"
         html += '</div>'
 
-    if 'subdomains' in data:
-        html += '<div class="module"><h2>Discovered Subdomains</h2><ul>'
-        for sub in data['subdomains']:
+    if 'subenum' in data and data.get('subenum'):
+        html += '<div class="module"><h2>Discovered Subdomains (Passive)</h2><ul>'
+        for sub in data['subenum']:
             html += f"<li>{sub}</li>"
         html += '</ul></div>'
 
-    if 'directories' in data:
+    if 'subfuzz' in data and data.get('subfuzz'):
+        html += '<div class="module"><h2>Discovered Subdomains (Bruteforce)</h2><ul>'
+        for sub in data['subfuzz']:
+            html += f"<li>{sub}</li>"
+        html += '</ul></div>'
+
+    if 'dirfuzz' in data and data.get('dirfuzz'):
         html += '<div class="module"><h2>Discovered Directories</h2><ul>'
-        for d in data['directories']:
+        for d in data['dirfuzz']:
             html += f"<li>{d}</li>"
         html += '</ul></div>'
 
-    if 'whatweb' in data:
+    if 'whatweb' in data and data.get('whatweb'):
         html += '<div class="module"><h2>Web Technologies</h2>'
         for tech in data['whatweb']:
             html += f"<h3>{tech.get('target')}</h3><ul>"
             for plugin, info in tech.get('plugins', {}).items():
-                version = ', '.join(map(str, info.get('version', [])))
-                html += f"<li><b>{plugin}:</b> {version}</li>"
+                details = []
+                if 'version' in info and info['version']:
+                    details.append(f"Version: {', '.join(map(str, info['version']))}")
+                if 'string' in info and info['string']:
+                    details.append(f"Info: {', '.join(map(str, info['string']))}")
+                html += f"<li><b>{plugin}:</b> {' | '.join(details)}</li>"
             html += "</ul>"
-        html += '</div>'
-
-    if 'nikto' in data:
-        html += '<div class="module"><h2>Nikto Findings</h2><ul>'
-        for finding in data['nikto']:
-            html += f"<li>{finding}</li>"
-        html += '</ul></div>'
-
-    if 'sqlmap' in data:
-        html += '<div class="module"><h2>SQLMap Scan</h2>'
-        if data['sqlmap'].get('vulnerable'):
-            html += "<p><b>Potential SQL injection found!</b></p><ul>"
-            for vuln in data['sqlmap'].get('vulnerabilities', []):
-                html += f"<li>{vuln}</li>"
-            html += "</ul>"
-        else:
-            html += "<p>No obvious SQL injection points found.</p>"
         html += '</div>'
 
     html += """
