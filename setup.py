@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'rich',
-        'google-generativeai',
+        'ollama',
     ],
     entry_points={
         'console_scripts': [
