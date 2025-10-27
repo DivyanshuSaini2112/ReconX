@@ -43,6 +43,8 @@ sudo apt-get update && sudo apt-get install nmap subfinder gobuster ffuf whatweb
 
 The `--ai-summary` feature uses a local AI model through [Ollama](https://ollama.ai/). This is **100% free, private, and works offline.**
 
+>**Important:** `reconx` uses your **local** installation of Ollama. It does not connect to the Ollama cloud service. You do not need an online account, API keys, or a paid subscription to use this feature.
+
 1.  **Install Ollama:** Follow the official instructions to download and install Ollama on your system.
 2.  **Download a Model:** Pull a model for the summary generation. `llama3` is recommended:
     ```bash
