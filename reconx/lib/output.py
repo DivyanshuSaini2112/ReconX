@@ -24,8 +24,8 @@ def generate_summary(data):
             for port in host['ports']:
                 if port['state'] == 'open':
                     service = port.get('service', {})
-                    product = service.get('product', '')
-                    version = service.get('version', '')
+                    product = service.get('product') or ''
+                    version = service.get('version') or ''
                     service_info = f"{product} {version}".strip()
                     summary += f"- **Port {port['portid']}/{port['protocol']}:** {service.get('name', 'unknown')} ({service_info})\n"
                     if port['portid'] in ['80', '443', '8080']:
@@ -42,32 +42,53 @@ def generate_summary(data):
             summary += f"### Target: {target}\n"
             plugins = tech.get('plugins', {})
             for plugin, info in plugins.items():
-                version = ', '.join(map(str, info.get('version', [])))
-                summary += f"- **{plugin}:** {version}\n"
-                if version:
-                    action_list.append(f"Research vulnerabilities for {plugin} version {version}.")
+                details = []
+                if 'version' in info and info['version']:
+                    details.append(f"Version: {', '.join(map(str, info['version']))}")
+                if 'string' in info and info['string']:
+                    details.append(f"Info: {', '.join(map(str, info['string']))}")
+
+                summary += f"- **{plugin}:** {' | '.join(details)}\n"
+                if 'version' in info and info['version']:
+                    action_list.append(f"Research vulnerabilities for {plugin} version {info['version'][0]}.")
+        summary += "\n"
+
+    # Subdomain results
+    if 'subdomains' in data:
+        summary += "## Discovered Subdomains\n"
+        if data['subdomains']:
+            for sub in data['subdomains']:
+                summary += f"- {sub}\n"
+        else:
+            summary += "No subdomains found.\n"
         summary += "\n"
 
     # Directory fuzzing results
-    if 'directories' in data and data['directories']:
+    if 'directories' in data:
         summary += "## Interesting Directories/Files\n"
-        for directory in data['directories'][:10]:
-            summary += f"- {directory}\n"
-            if any(admin_path in directory for admin_path in ['/admin', '/dashboard', '/login']):
-                 action_list.append(f"Manually investigate sensitive path: {directory}")
-        if len(data['directories']) > 10:
-            summary += "- ... and more.\n"
+        if data['directories']:
+            for directory in data['directories'][:10]:
+                summary += f"- {directory}\n"
+                if any(admin_path in directory for admin_path in ['/admin', '/dashboard', '/login']):
+                     action_list.append(f"Manually investigate sensitive path: {directory}")
+            if len(data['directories']) > 10:
+                summary += "- ... and more.\n"
+        else:
+            summary += "No interesting directories found.\n"
         summary += "\n"
 
     # Nikto findings
-    if 'nikto' in data and data['nikto']:
+    if 'nikto' in data:
         summary += "## Nikto Findings\n"
-        for finding in data['nikto'][:10]:
-            summary += f"- {finding}\n"
-            if 'OSVDB-3233' in finding: # Apache default file
-                action_list.append("Review Apache default files for information disclosure.")
-        if len(data['nikto']) > 10:
-            summary += "- ... and more.\n"
+        if data['nikto']:
+            for finding in data['nikto'][:10]:
+                summary += f"- {finding}\n"
+                if 'OSVDB-3233' in finding: # Apache default file
+                    action_list.append("Review Apache default files for information disclosure.")
+            if len(data['nikto']) > 10:
+                summary += "- ... and more.\n"
+        else:
+            summary += "No significant findings from Nikto scan.\n"
         summary += "\n"
 
     # SQLMap results
@@ -102,19 +123,20 @@ def save_text_summary(summary, output_dir):
     except IOError as e:
         print(f"[!] Error saving text summary: {e}")
 
-from openai import OpenAI
+import google.generativeai as genai
 
 def generate_ai_summary(data):
-    """Generates a summary using an AI model."""
-    api_key = os.environ.get("OPENAI_API_KEY")
+    """Generates a summary using the Google Gemini Pro model."""
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        print("[!] OPENAI_API_KEY environment variable not set. Skipping AI summary.")
+        print("[!] GEMINI_API_KEY environment variable not set. Skipping AI summary.")
         return None
 
-    client = OpenAI(api_key=api_key)
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-pro')
 
     prompt = f"""
-    You are a senior penetration tester. Analyze the following reconnaissance data and provide a brief, actionable summary for a client.
+    As a senior penetration tester, analyze the following reconnaissance data. Provide a brief, actionable summary for a client.
     Focus on the most critical findings and suggest the top 3-5 immediate next steps.
 
     Data:
@@ -122,20 +144,10 @@ def generate_ai_summary(data):
     """
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a senior penetration tester."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=500,
-            n=1,
-            stop=None,
-            temperature=0.7,
-        )
-        return response.choices[0].message.content.strip()
+        response = model.generate_content(prompt)
+        return response.text.strip()
     except Exception as e:
-        print(f"[!] Error generating AI summary: {e}")
+        print(f"[!] Error generating AI summary with Gemini Pro: {e}")
         return None
 
 def save_html_report(data, output_dir):

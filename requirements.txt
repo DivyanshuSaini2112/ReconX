@@ -1,2 +1,2 @@
 rich
-openai
+google-generativeai

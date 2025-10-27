@@ -24,16 +24,13 @@ class DirectoryFuzzer:
             subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
-            print("[!] Error: 'gobuster' command not found. Make sure it's installed and in your PATH.")
-            return None
+            return {'error': "'gobuster' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            print(f"[!] Gobuster scan timed out after {timeout} seconds.")
-            return None
+            return {'error': f"Gobuster scan timed out after {timeout} seconds."}
         except subprocess.CalledProcessError as e:
             # Gobuster exits with a non-zero status code on some errors (e.g., DNS), so we check stderr
             if 'error connecting to' in e.stderr.lower():
-                 print(f"[!] Error running Gobuster: {e.stderr}")
-                 return None
+                 return {'error': f"Error running Gobuster: {e.stderr}"}
             # Otherwise, we can still parse the output
             return self.parse_results()
 

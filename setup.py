@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'rich',
-        'openai',
+        'google-generativeai',
     ],
     entry_points={
         'console_scripts': [

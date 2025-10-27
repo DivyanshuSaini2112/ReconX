@@ -17,14 +17,11 @@ class NiktoScanner:
             subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
-            print("[!] Error: 'nikto' command not found. Make sure it's installed and in your PATH.")
-            return None
+            return {'error': "'nikto' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            print(f"[!] Nikto scan timed out after {timeout} seconds.")
-            return None
+            return {'error': f"Nikto scan timed out after {timeout} seconds."}
         except subprocess.CalledProcessError as e:
             # Nikto often exits with a non-zero status code, so we'll parse the output anyway
-            print(f"[!] Nikto exited with a non-zero status, but we will attempt to parse the output. Stderr: {e.stderr}")
             return self.parse_results()
 
     def parse_results(self):
