@@ -26,15 +26,16 @@ class SqlmapScanner:
             '--output-dir', self.output_dir
         ]
 
-    def run_scan(self):
+    def run_scan(self, timeout=None):
         command = self.get_command()
-        print(f"[*] Running SQLMap scan: {' '.join(command)}")
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            print("[+] SQLMap scan completed.")
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
             print("[!] Error: 'sqlmap' command not found. Make sure it's installed and in your PATH.")
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"[!] SQLMap scan timed out after {timeout} seconds.")
             return None
         except subprocess.CalledProcessError as e:
             print(f"[!] Error running SQLMap: {e.stderr}")

@@ -12,15 +12,16 @@ class WhatWebScanner:
         # We use --log-json to get structured output
         return ['whatweb', '--log-json', self.output_file, self.target]
 
-    def run_scan(self):
+    def run_scan(self, timeout=None):
         command = self.get_command()
-        print(f"[*] Running WhatWeb scan: {' '.join(command)}")
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            print("[+] WhatWeb scan completed.")
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
             return self.parse_results()
         except FileNotFoundError:
             print("[!] Error: 'whatweb' command not found. Make sure it's installed and in your PATH.")
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"[!] WhatWeb scan timed out after {timeout} seconds.")
             return None
         except subprocess.CalledProcessError as e:
             print(f"[!] Error running WhatWeb: {e.stderr}")

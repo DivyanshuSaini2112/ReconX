@@ -1,7 +1,7 @@
 import unittest
 import os
 import shutil
-from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto
+from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, ffuf
 
 class TestParsers(unittest.TestCase):
 
@@ -13,6 +13,7 @@ class TestParsers(unittest.TestCase):
         self.sample_dirfuzz_file = 'tests/sample_dirfuzz.txt'
         self.sample_whatweb_file = 'tests/sample_whatweb.json'
         self.sample_nikto_file = 'tests/sample_nikto.txt'
+        self.sample_ffuf_file = 'tests/sample_ffuf.json'
 
     def test_nmap_parser(self):
         scanner = nmap.NmapScanner('localhost', 'default', self.output_dir)
@@ -58,6 +59,15 @@ class TestParsers(unittest.TestCase):
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 3)
         self.assertTrue(any('X-Frame-Options' in s for s in parsed_data))
+
+    def test_ffuf_parser(self):
+        scanner = ffuf.FfufFuzzer('http://example.com', None, 10, self.output_dir)
+        scanner.output_file = self.sample_ffuf_file
+        parsed_data = scanner.parse_results()
+        self.assertIsNotNone(parsed_data)
+        self.assertEqual(len(parsed_data), 2)
+        self.assertIn('admin', parsed_data)
+        self.assertIn('images', parsed_data)
 
     def tearDown(self):
         if os.path.exists(self.output_dir):
