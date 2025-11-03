@@ -3,11 +3,15 @@ import sys
 import os
 import datetime
 import concurrent.futures
+import threading
+import tty
+import termios
+import select
 from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, sqlmap, ffuf, subfuzz, urlscan
 from reconx.lib import output
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
 console = Console()
 
@@ -22,11 +26,11 @@ def run_module(module_name, args, output_dir, timeout):
         if args.fuzzer == 'ffuf':
             scanner = ffuf.FfufFuzzer(args.target, args.wordlist, args.threads, output_dir, args.ffuf_args)
         else:
-            scanner = dirfuzz.DirectoryFuzzer(args.target, args.wordlist, args.threads, output_dir, args.gobuster_args)
+            scanner = dirfuzz.DirectoryFuzzer(args.target, args.profile, args.wordlist, args.threads, output_dir, args.gobuster_args)
     elif module_name == 'whatweb':
         scanner = whatweb.WhatWebScanner(args.target, output_dir)
     elif module_name == 'nikto':
-        scanner = nikto.NiktoScanner(args.target, output_dir)
+        scanner = nikto.NiktoScanner(args.target, args.profile, output_dir)
     elif module_name == 'sqlmap':
         scanner = sqlmap.SqlmapScanner(args.target, output_dir)
     elif module_name == 'subfuzz':
@@ -43,6 +47,32 @@ def run_module(module_name, args, output_dir, timeout):
             results = scanner.run_scan(timeout=timeout)
             return module_name, results
     return module_name, None
+
+stop_thread = threading.Event()
+running_futures = []
+futures_lock = threading.Lock()
+
+def listen_for_status_key(progress):
+    """Listen for a key press and display the status of running tasks."""
+    old_settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+        while not stop_thread.is_set():
+            if select.select([sys.stdin], [], [], 0.1)[0]:
+                char = sys.stdin.read(1)
+                if char == '\t':  # Tab key
+                    with futures_lock:
+                        if running_futures:
+                            console.print("\n[bold magenta]--- CURRENTLY RUNNING MODULES ---[/]")
+                            for future, name in running_futures:
+                                if not future.done():
+                                    console.print(f"  - [yellow]{name}[/]")
+                            console.print("[bold magenta]---------------------------------[/]\n")
+                        else:
+                            console.print("\n[bold magenta]--- NO MODULES CURRENTLY RUNNING ---[/]\n")
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -112,22 +142,42 @@ def main():
         for module_name in enabled_modules:
             run_module(module_name, args, output_dir, timeout)
     else:
-        with Progress(console=console) as progress:
-            tasks = {name: progress.add_task(f"[cyan]Queued {name}...", visible=True) for name in enabled_modules}
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(enabled_modules)) as executor:
-                future_to_module = {executor.submit(run_module, name, args, output_dir, timeout): name for name in enabled_modules}
+        console.print("\n[bold cyan]Press 'Tab' to see the status of running modules.[/]")
+        status_thread = threading.Thread(target=listen_for_status_key, args=(None,))
+        status_thread.daemon = True
+        status_thread.start()
 
-                for future in concurrent.futures.as_completed(future_to_module):
-                    module_name = future_to_module[future]
-                    progress.update(tasks[module_name], description=f"[yellow]Running {module_name}...")
-                    try:
-                        _, module_results = future.result()
-                        if module_results:
-                            results[module_name] = module_results
-                        progress.update(tasks[module_name], completed=100, description=f"[green]Finished {module_name}")
-                    except Exception as exc:
-                        progress.update(tasks[module_name], description=f"[red]Error in {module_name}")
-                        console.print(f"\n[bold red]ERROR[/]: {module_name} generated an exception: {exc}")
+        try:
+            with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                "[progress.percentage]{task.percentage:>3.0f}%",
+                TimeElapsedColumn(),
+                console=console
+            ) as progress:
+                tasks = {name: progress.add_task(f"[yellow]Running {name}...", visible=True) for name in enabled_modules}
+                with concurrent.futures.ThreadPoolExecutor(max_workers=len(enabled_modules)) as executor:
+                    future_to_module = {executor.submit(run_module, name, args, output_dir, timeout): name for name in enabled_modules}
+
+                    with futures_lock:
+                        running_futures.extend([(future, name) for future, name in future_to_module.items()])
+
+                    for future in concurrent.futures.as_completed(future_to_module):
+                        module_name = future_to_module[future]
+                        try:
+                            _, module_results = future.result()
+                            if module_results:
+                                results[module_name] = module_results
+                            progress.update(tasks[module_name], completed=100, description=f"[green]Finished {module_name}")
+                        except Exception as exc:
+                            progress.update(tasks[module_name], completed=100, description=f"[red]Error in {module_name}")
+                            console.print(f"\n[bold red]ERROR[/]: {module_name} generated an exception: {exc}")
+                        finally:
+                            with futures_lock:
+                                running_futures[:] = [(f, n) for f, n in running_futures if f is not future]
+        finally:
+            stop_thread.set()
+            status_thread.join()
 
     console.print("\n--- Reconnaissance Complete ---")
 

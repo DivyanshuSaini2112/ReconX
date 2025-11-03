@@ -2,14 +2,22 @@ import subprocess
 import os
 
 class DirectoryFuzzer:
-    def __init__(self, target, wordlist, threads, output_dir, gobuster_args=''):
+    def __init__(self, target, profile, wordlist, threads, output_dir, gobuster_args=''):
         self.target = target
-        self.wordlist = wordlist if wordlist else '/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt'
+        self.profile = profile
+        self.wordlist = wordlist
         self.threads = threads
         self.output_dir = output_dir
         self.gobuster_args = gobuster_args
         self.output_file = os.path.join(self.output_dir, 'dirfuzz.txt')
         self.log_file = os.path.join(self.output_dir, 'dirfuzz.log')
+
+        if not self.wordlist:
+            if self.profile == 'fast':
+                # Use a smaller wordlist for a faster scan
+                self.wordlist = '/usr/share/wordlists/dirb/common.txt'
+            else:
+                self.wordlist = '/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt'
 
     def get_command(self):
         base_cmd = f'gobuster dir -u {self.target} -w {self.wordlist} -t {self.threads} -o {self.output_file}'
@@ -56,6 +64,6 @@ class DirectoryFuzzer:
         except FileNotFoundError:
             return {'error': f"Gobuster output file not found: {self.output_file}"}
 
-def run(target, wordlist, threads, output_dir, gobuster_args):
-    fuzzer = DirectoryFuzzer(target, wordlist, threads, output_dir, gobuster_args)
+def run(target, profile, wordlist, threads, output_dir, gobuster_args):
+    fuzzer = DirectoryFuzzer(target, profile, wordlist, threads, output_dir, gobuster_args)
     return fuzzer.run_scan()

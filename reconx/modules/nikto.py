@@ -2,15 +2,19 @@ import subprocess
 import os
 
 class NiktoScanner:
-    def __init__(self, target, output_dir):
+    def __init__(self, target, profile, output_dir):
         self.target = target
+        self.profile = profile
         self.output_dir = output_dir
         self.output_file = os.path.join(self.output_dir, 'nikto.txt')
         self.log_file = os.path.join(self.output_dir, 'nikto.log')
 
     def get_command(self):
-        # We use -o to specify the output file, and -Format txt is the default
-        return ['nikto', '-h', self.target, '-o', self.output_file, '-Format', 'txt']
+        base_cmd = ['nikto', '-h', self.target, '-o', self.output_file, '-Format', 'txt']
+        if self.profile == 'fast':
+            # Perform a quicker scan by focusing on a limited set of checks
+            base_cmd.extend(['-Tuning', 'x', '0', '1', '2', '3'])
+        return base_cmd
 
     def run_scan(self, timeout=None):
         command = self.get_command()
@@ -50,6 +54,6 @@ class NiktoScanner:
         except FileNotFoundError:
             return {'error': f"Nikto output file not found: {self.output_file}"}
 
-def run(target, output_dir):
-    scanner = NiktoScanner(target, output_dir)
+def run(target, profile, output_dir):
+    scanner = NiktoScanner(target, profile, output_dir)
     return scanner.run_scan()

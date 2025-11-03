@@ -36,7 +36,7 @@ class TestParsers(unittest.TestCase):
         self.assertIn('test.example.com', parsed_data)
 
     def test_dirfuzz_parser(self):
-        scanner = dirfuzz.DirectoryFuzzer('http://example.com', None, 10, self.output_dir)
+        scanner = dirfuzz.DirectoryFuzzer('http://example.com', 'default', None, 10, self.output_dir)
         scanner.output_file = self.sample_dirfuzz_file
         parsed_data = scanner.parse_results()
         self.assertIsNotNone(parsed_data)
@@ -53,7 +53,7 @@ class TestParsers(unittest.TestCase):
         self.assertIn('Apache', parsed_data[0]['plugins'])
 
     def test_nikto_parser(self):
-        scanner = nikto.NiktoScanner('http://example.com', self.output_dir)
+        scanner = nikto.NiktoScanner('http://example.com', 'default', self.output_dir)
         scanner.output_file = self.sample_nikto_file
         parsed_data = scanner.parse_results()
         self.assertIsNotNone(parsed_data)
