@@ -53,7 +53,7 @@ def main():
     # ... (parser arguments are unchanged) ...
     parser.add_argument('-t', '--target', required=True, help='The target IP, domain, or CIDR.')
     parser.add_argument('--modules', default='nmap,subenum,dirfuzz,whatweb,nikto,urlscan', help='Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz,subfuzz,urlscan).')
-    parser.add_argument('--profile', choices=['fast', 'default', 'deep'], default='default', help='Scan profile (fast, default, deep).')
+    parser.add_argument('--profile', choices=['fast', 'default', 'deep'], default='default', help='Scan profile. Note: fast profile may cause timeouts on some modules.')
     parser.add_argument('--threads', type=int, default=10, help='Number of concurrent threads for fuzzing/discovery.')
     parser.add_argument('--wordlist', help='Path to a custom wordlist for directory fuzzing.')
     parser.add_argument('--fuzzer', choices=['gobuster', 'ffuf'], default='gobuster', help='Choose the directory fuzzer to use.')
@@ -99,7 +99,7 @@ def main():
     console.print(f"[+] [bold]Output directory:[/] {output_dir}")
 
     profile_timeouts = {
-        'fast': 300,    # 5 minutes
+        'fast': 600,    # 10 minutes
         'default': 1800, # 30 minutes
         'deep': 7200     # 2 hours
     }
