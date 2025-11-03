@@ -136,15 +136,19 @@ def main():
         output.save_json_output(results, output_dir)
         summary = output.generate_summary(results)
         output.save_text_summary(results, output_dir)
-        if args.html:
-            output.save_html_report(results, output_dir)
 
+        ai_summary_text = None
         if args.ai_summary:
-            ai_summary = output.generate_ai_summary(results)
-            if ai_summary:
-                console.print(Panel(ai_summary, title="AI-Powered Summary", border_style="purple"))
+            ai_summary_text = output.generate_ai_summary(results)
+            if ai_summary_text:
+                console.print(Panel(ai_summary_text, title="AI-Powered Summary", border_style="purple"))
+
+        if args.html:
+            output.save_html_report(results, output_dir, ai_summary=ai_summary_text)
 
         console.print(Panel(summary, title="Initial Attack Vector Summary", border_style="green"))
+
+        console.print("\n[bold yellow]NOTE:[/] If you've made changes to the source code, please run '[bold cyan]pip install .[/]' to apply them.", style="italic")
 
 if __name__ == '__main__':
     main()

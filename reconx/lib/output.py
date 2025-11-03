@@ -136,7 +136,7 @@ def save_text_summary(data, output_dir):
 
 
 
-def save_html_report(data, output_dir):
+def save_html_report(data, output_dir, ai_summary=None):
     """Generates and saves a self-contained HTML report."""
     html = """
     <!DOCTYPE html>
@@ -160,6 +160,14 @@ def save_html_report(data, output_dir):
         <div class="container">
             <h1>ReconX Scan Report</h1>
     """
+
+    if ai_summary:
+        html += f"""
+        <div class="module">
+            <h2>AI-Powered Summary</h2>
+            <div class="code">{ai_summary.replace('\\n', '<br>')}</div>
+        </div>
+        """
 
     if 'nmap' in data and data.get('nmap'):
         html += '<div class="module"><h2>Nmap Results</h2>'
@@ -256,7 +264,7 @@ def generate_ai_summary(data):
                     "content": prompt,
                 }
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
         )
         return chat_completion.choices[0].message.content.strip()
     except Exception as e:
