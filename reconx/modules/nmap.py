@@ -8,29 +8,68 @@ class NmapScanner:
         self.profile = profile
         self.output_dir = output_dir
         self.nmap_args = nmap_args
-        self.output_file = os.path.join(self.output_dir, 'nmap_scan.xml')
+        self.quick_scan_file = os.path.join(self.output_dir, 'nmap_quick_scan.xml')
+        self.output_file = os.path.join(self.output_dir, 'nmap_detailed_scan.xml')
 
     def get_command(self):
-        base_cmd = f'nmap -oX {self.output_file} {self.target}'
+        """Returns a descriptive list of commands for no-exec mode."""
+        return [
+            f"Stage 1 (Port Discovery): nmap -T4 -F -oX {self.quick_scan_file} {self.target}",
+            f"Stage 2 (Detailed Scan): nmap -p <open_ports> [profile_args] -oX {self.output_file} {self.target}"
+        ]
 
-        profile_args = {
-            'fast': '-T4 -F -sV --version-light',
-            'default': '-T4 -sV -sC',
-            'deep': '-T4 -sV -sC -p- -A'
-        }
-
-        cmd = f'{base_cmd} {profile_args.get(self.profile, "")}'
-
-        if self.nmap_args:
-            cmd += f' {self.nmap_args}'
-
-        return cmd.split()
-
-    def run_scan(self, timeout=None):
-        command = self.get_command()
+    def _run_quick_scan(self, timeout):
+        """Runs a fast scan to discover open ports."""
+        command = ['nmap', '-T4', '-F', '-oX', self.quick_scan_file, self.target]
         try:
             subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
+            return self._parse_open_ports()
+        except FileNotFoundError:
+            raise
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            # Pass the original exception up
+            raise e
+
+    def _parse_open_ports(self):
+        """Parses the quick scan XML to find open ports."""
+        try:
+            tree = ET.parse(self.quick_scan_file)
+            root = tree.getroot()
+            open_ports = []
+            for port in root.findall(".//port"):
+                if port.find(".//state[@state='open']") is not None:
+                    open_ports.append(port.get('portid'))
+            return open_ports
+        except (ET.ParseError, FileNotFoundError):
+            return []
+
+    def run_scan(self, timeout=None):
+        try:
+            # Stage 1: Quick Scan
+            open_ports = self._run_quick_scan(timeout)
+
+            if not open_ports:
+                return {'message': 'No open ports found in the initial scan.'}
+
+            ports_str = ",".join(open_ports)
+
+            # Stage 2: Detailed Scan
+            profile_args = {
+                'fast': ['-T4', '-sV', '--version-light'],
+                'default': ['-T4', '-sV', '-sC'],
+                'deep': ['-T4', '-sV', '-sC', '-A']
+            }
+
+            base_cmd = ['nmap', '-p', ports_str, '-oX', self.output_file]
+            detailed_cmd = base_cmd + profile_args.get(self.profile, [])
+            if self.nmap_args:
+                detailed_cmd.extend(self.nmap_args.split())
+            detailed_cmd.append(self.target)
+
+            subprocess.run(detailed_cmd, check=True, capture_output=True, text=True, timeout=timeout)
+
             return self.parse_results()
+
         except FileNotFoundError:
             return {'error': "'nmap' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
@@ -85,7 +124,3 @@ class NmapScanner:
         except FileNotFoundError:
             print(f"[!] Nmap output file not found: {self.output_file}")
             return None
-
-def run(target, profile, output_dir, nmap_args):
-    scanner = NmapScanner(target, profile, output_dir, nmap_args)
-    return scanner.run_scan()

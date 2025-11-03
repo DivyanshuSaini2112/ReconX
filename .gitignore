@@ -9,3 +9,6 @@ results/
 
 # Test artifacts
 tests/tmp/
+
+# Config file
+reconx/config.ini

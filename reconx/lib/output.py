@@ -55,6 +55,23 @@ def generate_summary(data):
                 table.add_row(tech.get('target'), plugin, ' | '.join(details))
         renderables.append(table)
 
+    # URLScan.io results
+    if 'urlscan' in data and data.get('urlscan'):
+        table = Table(title="URLScan.io Analysis", style="cyan", title_style="bold cyan")
+        table.add_column("Category", style="bold magenta")
+        table.add_column("Details")
+
+        if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
+            table.add_row("Technologies", ", ".join(data['urlscan']['technologies']))
+        if 'ips' in data['urlscan'] and data['urlscan']['ips']:
+            table.add_row("IPs", ", ".join(data['urlscan']['ips']))
+        if 'domains' in data['urlscan'] and data['urlscan']['domains']:
+            table.add_row("Domains", ", ".join(data['urlscan']['domains']))
+        if 'network_calls' in data['urlscan'] and data['urlscan']['network_calls']:
+            table.add_row("Network Calls", str(len(data['urlscan']['network_calls'])))
+
+        renderables.append(table)
+
     # Subdomain results
     if 'subenum' in data and data.get('subenum'):
         table = Table(title="Discovered Subdomains (Passive)", style="cyan", title_style="bold cyan")
@@ -97,6 +114,18 @@ def save_text_summary(data, output_dir):
                     summary += f"- {host['ip']}:{port['portid']}/{port['protocol']} - {service.get('name', 'unknown')} ({service_info})\n"
         summary += "\n"
 
+    if 'urlscan' in data and data.get('urlscan'):
+        summary += "## URLScan.io Analysis\n"
+        if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
+            summary += f"- Technologies: {', '.join(data['urlscan']['technologies'])}\n"
+        if 'ips' in data['urlscan'] and data['urlscan']['ips']:
+            summary += f"- IPs: {', '.join(data['urlscan']['ips'])}\n"
+        if 'domains' in data['urlscan'] and data['urlscan']['domains']:
+            summary += f"- Domains: {', '.join(data['urlscan']['domains'])}\n"
+        if 'network_calls' in data['urlscan'] and data['urlscan']['network_calls']:
+            summary += f"- Network Calls: {len(data['urlscan']['network_calls'])}\n"
+        summary += "\n"
+
     output_file = os.path.join(output_dir, 'summary.txt')
     try:
         with open(output_file, 'w') as f:
@@ -106,26 +135,6 @@ def save_text_summary(data, output_dir):
         print(f"[!] Error saving text summary: {e}")
 
 
-import ollama
-
-def generate_ai_summary(data):
-    """Generates a summary using a local Ollama model."""
-    prompt = f"""
-    As a senior penetration tester, analyze the following reconnaissance data. Provide a brief, actionable summary for a client.
-    Focus on the most critical findings and suggest the top 3-5 immediate next steps.
-
-    Data:
-    {json.dumps(data, indent=2)}
-    """
-
-    try:
-        response = ollama.chat(
-            model='llama3',
-            messages=[{'role': 'user', 'content': prompt}]
-        )
-        return response['message']['content'].strip()
-    except Exception as e:
-        return f"[bold red]Error generating AI summary with Ollama: {e}. Is the Ollama server running?[/bold red]"
 
 def save_html_report(data, output_dir):
     """Generates and saves a self-contained HTML report."""
@@ -161,6 +170,16 @@ def save_html_report(data, output_dir):
                     service = port.get('service', {})
                     html += f"<tr><td>{port['portid']}</td><td>{port['protocol']}</td><td>{service.get('name', 'N/A')}</td><td>{service.get('product', 'N/A')}</td><td>{service.get('version', 'N/A')}</td></tr>"
             html += "</table>"
+        html += '</div>'
+
+    if 'urlscan' in data and data.get('urlscan'):
+        html += '<div class="module"><h2>URLScan.io Analysis</h2>'
+        if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
+            html += f"<h3>Technologies</h3><ul>{''.join(f'<li>{tech}</li>' for tech in data['urlscan']['technologies'])}</ul>"
+        if 'ips' in data['urlscan'] and data['urlscan']['ips']:
+            html += f"<h3>IPs</h3><ul>{''.join(f'<li>{ip}</li>' for ip in data['urlscan']['ips'])}</ul>"
+        if 'domains' in data['urlscan'] and data['urlscan']['domains']:
+            html += f"<h3>Domains</h3><ul>{''.join(f'<li>{domain}</li>' for domain in data['urlscan']['domains'])}</ul>"
         html += '</div>'
 
     if 'subenum' in data and data.get('subenum'):
@@ -208,3 +227,37 @@ def save_html_report(data, output_dir):
         print(f"[+] HTML report saved to: {output_file}")
     except IOError as e:
         print(f"[!] Error saving HTML report: {e}")
+
+import groq
+from .config import get_api_key
+
+def generate_ai_summary(data):
+    """Generates a summary using the Groq API."""
+    api_key = get_api_key('GROQ_API_KEY')
+    if not api_key:
+        return "[bold red]Error: Groq API key not found.[/bold red]"
+
+    client = groq.Groq(api_key=api_key)
+
+    prompt = f"""
+    As a senior penetration tester, analyze the following reconnaissance data.
+    Correlate the output of all the modules and give possible weak points of the site and entry points for a pentester to exploit.
+    Focus on the most critical findings and suggest the top 3-5 immediate next steps.
+
+    Data:
+    {json.dumps(data, indent=2)}
+    """
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="llama3-8b-8192",
+        )
+        return chat_completion.choices[0].message.content.strip()
+    except Exception as e:
+        return f"[bold red]Error generating AI summary with Groq: {e}[/bold red]"

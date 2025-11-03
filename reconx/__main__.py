@@ -3,7 +3,7 @@ import sys
 import os
 import datetime
 import concurrent.futures
-from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, sqlmap, ffuf, subfuzz
+from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, sqlmap, ffuf, subfuzz, urlscan
 from reconx.lib import output
 from rich.console import Console
 from rich.panel import Panel
@@ -31,6 +31,8 @@ def run_module(module_name, args, output_dir, timeout):
         scanner = sqlmap.SqlmapScanner(args.target, output_dir)
     elif module_name == 'subfuzz':
         scanner = subfuzz.SubdomainFuzzer(args.target, args.wordlist, args.threads, output_dir, args.ffuf_args)
+    elif module_name == 'urlscan':
+        scanner = urlscan.UrlScanScanner(args.target, output_dir)
 
     if scanner:
         if args.no_exec:
@@ -50,7 +52,7 @@ def main():
 
     # ... (parser arguments are unchanged) ...
     parser.add_argument('-t', '--target', required=True, help='The target IP, domain, or CIDR.')
-    parser.add_argument('--modules', default='nmap,subenum,dirfuzz,whatweb,nikto', help='Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz,subfuzz).')
+    parser.add_argument('--modules', default='nmap,subenum,dirfuzz,whatweb,nikto,urlscan', help='Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz,subfuzz,urlscan).')
     parser.add_argument('--profile', choices=['fast', 'default', 'deep'], default='default', help='Scan profile (fast, default, deep).')
     parser.add_argument('--threads', type=int, default=10, help='Number of concurrent threads for fuzzing/discovery.')
     parser.add_argument('--wordlist', help='Path to a custom wordlist for directory fuzzing.')
