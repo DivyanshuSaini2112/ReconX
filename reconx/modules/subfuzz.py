@@ -23,24 +23,35 @@ class SubdomainFuzzer:
     def run_scan(self, timeout=None):
         command = self.get_command()
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
+            result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
+            if result.stderr:
+                with open(os.path.join(self.output_dir, 'ffuf_subfuzz.log'), 'w') as f:
+                    f.write(result.stderr)
+
             return self.parse_results()
         except FileNotFoundError:
             return {'error': "'ffuf' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
             return {'error': f"Subdomain fuzzing timed out after {timeout} seconds."}
         except subprocess.CalledProcessError as e:
+            # ffuf exits with status 1 when no results are found, so we check the stderr
+            if "Could not resolve host" in e.stderr:
+                 return {'error': f"Error running ffuf: Could not resolve host {self.target}"}
+            # For other errors, return the stderr
             return {'error': f"Error running ffuf for subdomain fuzzing: {e.stderr}"}
+
 
     def parse_results(self):
         try:
+            if not os.path.exists(self.output_file) or os.path.getsize(self.output_file) == 0:
+                return []
+
             with open(self.output_file, 'r') as f:
                 data = json.load(f)
             # Extract the 'input' which is the subdomain that was found
             return [result['input']['FUZZ'] for result in data.get('results', [])]
         except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-            print(f"[!] Error parsing ffuf JSON output for subdomain fuzzing: {e}")
-            return None
+            return {'error': f"Error parsing ffuf JSON output for subdomain fuzzing: {e}"}
 
 def run(target, wordlist, threads, output_dir, ffuf_args):
     fuzzer = SubdomainFuzzer(target, wordlist, threads, output_dir, ffuf_args)

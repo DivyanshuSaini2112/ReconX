@@ -13,7 +13,12 @@ class SubdomainScanner:
     def run_scan(self, timeout=None):
         command = self.get_command()
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
+            result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
+            if result.stderr:
+                # Subfinder often prints non-fatal errors to stderr
+                with open(os.path.join(self.output_dir, 'subfinder.log'), 'w') as f:
+                    f.write(result.stderr)
+
             return self.parse_results()
         except FileNotFoundError:
             return {'error': "'subfinder' command not found. Make sure it's installed and in your PATH."}
@@ -24,12 +29,16 @@ class SubdomainScanner:
 
     def parse_results(self):
         try:
+            if os.path.getsize(self.output_file) == 0:
+                return []
+
             with open(self.output_file, 'r') as f:
-                subdomains = [line.strip() for line in f]
+                subdomains = [line.strip() for line in f if line.strip()]
             return subdomains
         except FileNotFoundError:
-            print(f"[!] Subfinder output file not found: {self.output_file}")
-            return None
+            return {'error': f"Subfinder output file not found: {self.output_file}"}
+        except Exception as e:
+            return {'error': f"An unexpected error occurred while parsing Subfinder results: {e}"}
 
 def run(target, output_dir):
     scanner = SubdomainScanner(target, output_dir)

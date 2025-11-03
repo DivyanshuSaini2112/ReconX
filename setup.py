@@ -9,7 +9,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         'rich',
-        'ollama',
+        'requests',
+        'groq'
     ],
     entry_points={
         'console_scripts': [
