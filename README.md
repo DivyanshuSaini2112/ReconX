@@ -1,101 +1,243 @@
-# ReconX: Automated Reconnaissance Tool
+# ReconX — Automated Reconnaissance Tool
 
-ReconX is a CLI-first reconnaissance tool for Kali Linux that performs an automated initial reconnaissance sweep on a single target (IP, CIDR, or domain) and outputs aggregated, easy-to-parse results and an initial attack vector summary.
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Kali%20Linux-557C94?style=for-the-badge&logo=kalilinux" alt="Platform">
+  <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+</p>
 
-## Legal Disclaimer
+A CLI-first reconnaissance toolkit that automates security reconnaissance sweeps on targets (IP, CIDR, or domain). ReconX aggregates outputs from multiple security tools and produces structured JSON, text, and HTML reports.
 
-> This tool is intended for authorized security testing and educational purposes only. Unauthorized scanning of networks is illegal. The author is not responsible for any misuse or damage caused by this tool. By using this tool, you agree to the terms of the MIT License included in this repository.
+> ⚠️ **Legal Disclaimer**: For authorized security testing and educational purposes only. Unauthorized network scanning is illegal. Use only on systems you own or have explicit permission to test.
 
-## Installation
+---
 
-### Prerequisites
+## 🌟 Features
 
-ReconX is designed to run on Kali Linux and relies on the following tools being installed and available in your PATH:
+- **Multi-Tool Integration** — Nmap, Subfinder, Gobuster, ffuf, WhatWeb, Nikto, SQLMap
+- **Modular Architecture** — Run specific modules or combine them as needed
+- **Multiple Output Formats** — JSON, plain text, and HTML reports
+- **Concurrent Execution** — Fast parallel scanning
+- **AI-Powered Summaries** — Optional local AI analysis via Ollama
+- **Preview Mode** — Dry-run to see commands before execution
+- **Flexible Profiles** — Fast, default, or deep scan modes
 
-- [Nmap](https://nmap.org/)
-- [Subfinder](https://github.com/projectdiscovery/subfinder)
-- [Gobuster](https://github.com/OJ/gobuster)
-- [ffuf](https://github.com/ffuf/ffuf)
-- [WhatWeb](https://github.com/urbanadventurer/WhatWeb)
-- [Nikto](https://github.com/sullo/nikto)
-- [SQLMap](https://sqlmap.org/)
+---
 
-You can install these tools on Kali Linux using the following command:
+## 📁 File Structure
+
+```
+recony/
+├── README.md
+├── config.ini.example          # API keys configuration
+├── setup.py
+├── requirements.txt
+├── reconx/
+│   ├── __init__.py
+│   ├── __main__.py             # CLI entrypoint
+│   ├── lib/
+│   │   ├── config.py           # Config & API keys
+│   │   └── output.py           # Report generation
+│   └── modules/                # Scanner modules
+│       ├── nmap.py
+│       ├── subenum.py
+│       ├── dirfuzz.py
+│       ├── ffuf.py
+│       ├── whatweb.py
+│       ├── nikto.py
+│       ├── sqlmap.py
+│       └── urlscan.py
+├── results/                    # Output directory
+└── tests/                      # Unit tests
+```
+
+---
+
+## 🚀 Installation
+
+### 1. Install System Tools
 
 ```bash
-sudo apt-get update && sudo apt-get install nmap subfinder gobuster ffuf whatweb nikto sqlmap
+sudo apt update
+sudo apt install -y nmap gobuster ffuf whatweb nikto sqlmap
 ```
 
-### Installation from Source
-
-1.  Clone this repository:
-    ```bash
-    git clone https://github.com/your-username/reconx.git
-    cd reconx
-    ```
-
-2.  Install the Python dependencies:
-    ```bash
-    pip install .
-    ```
-
-### AI Summary Setup (Optional)
-
-The `--ai-summary` feature uses a local AI model through [Ollama](https://ollama.ai/). This is **100% free, private, and works offline.**
-
->**Important:** `reconx` uses your **local** installation of Ollama. It does not connect to the Ollama cloud service. You do not need an online account, API keys, or a paid subscription to use this feature.
-
-1.  **Install Ollama:** Follow the official instructions to download and install Ollama on your system.
-2.  **Download a Model:** Pull a model for the summary generation. `llama3` is recommended:
-    ```bash
-    ollama pull llama3
-    ```
-3.  **Run the Ollama Server:** Before using the `--ai-summary` flag, make sure the Ollama server is running in the background.
-
-## Usage
-
-```
-usage: reconx [-h] -t TARGET [--modules MODULES] [--profile {fast,default,deep}] [--threads THREADS] [--wordlist WORDLIST]
-              [--fuzzer {gobuster,ffuf}] [--out OUT] [--html] [--ai-summary] [--nmap-args NMAP_ARGS]
-              [--gobuster-args GOBUSTER_ARGS] [--ffuf-args FFuf_ARGS] [--sqlmap] [--no-exec]
-
-A CLI-first reconnaissance tool for Kali Linux.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -t TARGET, --target TARGET
-                        The target IP, domain, or CIDR.
-  --modules MODULES     Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz).
-  --profile {fast,default,deep}
-                        Scan profile (fast, default, deep).
-  --threads THREADS     Number of concurrent threads for fuzzing/discovery.
-  --wordlist WORDLIST   Path to a custom wordlist for directory fuzzing.
-  --fuzzer {gobuster,ffuf}
-                        Choose the directory fuzzer to use.
-  --out OUT             Directory to save results to.
-  --html                Generate an HTML report.
-  --ai-summary          Generate a summary using a local Ollama model.
-  --nmap-args NMAP_ARGS
-                        Custom arguments for Nmap.
-  --gobuster-args GOBUSTER_ARGS
-                        Custom arguments for Gobuster.
-  --ffuf-args FFuf_ARGS
-                        Custom arguments for ffuf.
-  --sqlmap              Explicitly enable the SQLMap module.
-  --no-exec             Print planned commands without executing them.
-
-Example: reconx -t example.com --profile default --modules nmap,subenum,dirfuzz --fuzzer ffuf --html --ai-summary
+Install Subfinder:
+```bash
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 ```
 
-## Output
+### 2. Clone & Install ReconX
 
-ReconX produces the following outputs in a timestamped directory:
+```bash
+git clone https://github.com/DivyanshuSaini2112/recony.git
+cd recony
+pip install .
+```
 
--   `reconx_results.json`: A JSON file containing all the aggregated results.
--   `summary.txt`: A plain-text summary of the findings.
--   `report.html`: An HTML report of the findings (if `--html` is specified).
--   Raw output files from each of the tools (`nmap_scan.xml`, `subdomains.txt`, etc.).
+### 3. Verify Installation
 
-## License
+```bash
+reconx --help
+```
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+---
+
+## ⚙️ Configuration (Optional)
+
+For modules requiring API keys (URLScan, etc.):
+
+```bash
+cp config.ini.example config.ini
+# Edit config.ini with your API keys
+```
+
+**For AI Summaries** (Optional):
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama3
+
+# Start Ollama server
+ollama serve
+```
+
+---
+
+## 📖 Usage
+
+### Basic Syntax
+
+```bash
+reconx -t <TARGET> [OPTIONS]
+```
+
+### Key Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `-t, --target` | Target IP, domain, or CIDR (required) |
+| `--modules` | Comma-separated modules: `nmap,subenum,dirfuzz,whatweb,nikto` |
+| `--profile` | Scan profile: `fast`, `default`, `deep` |
+| `--fuzzer` | Directory fuzzer: `gobuster` or `ffuf` |
+| `--threads` | Number of concurrent threads |
+| `--wordlist` | Custom wordlist path |
+| `--out` | Output directory (default: `./results`) |
+| `--html` | Generate HTML report |
+| `--ai-summary` | Generate AI summary (requires Ollama) |
+| `--no-exec` | Preview commands without execution |
+
+### Examples
+
+**Basic Scan:**
+```bash
+reconx -t example.com
+```
+
+**Full Scan with Reports:**
+```bash
+reconx -t example.com --profile default --modules nmap,subenum,dirfuzz,whatweb,nikto --html --ai-summary
+```
+
+**Fast Scan:**
+```bash
+reconx -t 192.168.1.100 --profile fast --modules nmap,dirfuzz
+```
+
+**Preview Commands:**
+```bash
+reconx -t example.com --no-exec
+```
+
+**Custom Configuration:**
+```bash
+reconx -t example.com --modules nmap,dirfuzz --threads 50 --wordlist /path/to/wordlist.txt --out ./my_results
+```
+
+---
+
+## 📄 Output Files
+
+Each scan creates a timestamped directory with:
+
+```
+results/example.com-2025-11-03_15-15-25/
+├── reconx_results.json         # Main aggregated results (JSON)
+├── summary.txt                 # Human-readable summary
+├── report.html                 # HTML report (if --html)
+├── ai_summary.txt              # AI analysis (if --ai-summary)
+├── nmap_quick_scan.xml         # Nmap quick scan
+├── nmap_detailed_scan.xml      # Nmap detailed scan
+├── subdomains.txt              # Discovered subdomains
+├── dirfuzz.txt                 # Directory fuzzing results
+├── whatweb.json                # Technology detection
+└── nikto.txt                   # Vulnerability scan
+```
+
+---
+
+## 🔄 How It Works
+
+```
+CLI Input → Parse Arguments → Initialize Modules → Execute Scans (Parallel)
+    ↓
+Raw Tool Outputs → Parse Results → Aggregate Data
+    ↓
+Generate Reports (JSON + Text + HTML + AI Summary)
+```
+
+**Module System**: Each module (`modules/*.py`) implements:
+- `get_command()` — Builds shell command
+- `run_scan()` — Executes tool via subprocess
+- `parse_results()` — Parses output into structured data
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+python -m unittest discover -v
+
+# Or with pytest
+pytest -q
+```
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Add tests for new functionality
+4. Commit changes: `git commit -m 'Add amazing feature'`
+5. Push to branch: `git push origin feature/amazing-feature`
+6. Open a Pull Request
+
+---
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Credits
+
+- **Nmap** - Gordon Lyon
+- **Subfinder** - ProjectDiscovery
+- **Gobuster** - OJ Reeves
+- **ffuf** - Joona Hoikkala
+- **WhatWeb** - Andrew Horton
+- **Nikto** - Chris Sullo & David Lodge
+- **SQLMap** - Bernardo Damele & Miroslav Stampar
+- **Ollama** - Local AI serving
+
+---
+
+**Made by [Divyanshu Saini](https://github.com/DivyanshuSaini2112)**
+
+Remember: Always get authorization before scanning! 🔒
