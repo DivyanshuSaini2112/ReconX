@@ -19,7 +19,7 @@ class NiktoScanner:
         except FileNotFoundError:
             return {'error': "'nikto' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            return {'error': f"Nikto scan timed out after {timeout} seconds."}
+            return {'error': f"Nikto scan timed out after {timeout} seconds. Try a longer scan profile, e.g., --profile default."}
         except subprocess.CalledProcessError as e:
             # Nikto often exits with a non-zero status code, so we'll parse the output anyway
             return self.parse_results()

@@ -26,7 +26,7 @@ class DirectoryFuzzer:
         except FileNotFoundError:
             return {'error': "'gobuster' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            return {'error': f"Gobuster scan timed out after {timeout} seconds."}
+            return {'error': f"Gobuster scan timed out after {timeout} seconds. Try a longer scan profile, e.g., --profile default."}
         except subprocess.CalledProcessError as e:
             # Gobuster exits with a non-zero status code on some errors (e.g., DNS), so we check stderr
             if 'error connecting to' in e.stderr.lower():
