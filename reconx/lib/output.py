@@ -138,6 +138,11 @@ def save_text_summary(data, output_dir):
 
 def save_html_report(data, output_dir, ai_summary=None):
     """Generates and saves a self-contained HTML report."""
+
+    # Helper to generate a unique ID for a module
+    def module_id(name):
+        return f"module-{name.lower().replace(' ', '-')}"
+
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -146,31 +151,138 @@ def save_html_report(data, output_dir, ai_summary=None):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>ReconX Report</title>
         <style>
-            body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
-            h1, h2, h3 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
-            .container { background: #fff; padding: 2em; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-            .module { margin-bottom: 2em; }
-            .code { background: #eee; padding: 0.5em; border-radius: 3px; font-family: monospace; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
+            :root {
+                --primary-color: #2c3e50;
+                --secondary-color: #3498db;
+                --background-color: #ecf0f1;
+                --container-bg: #ffffff;
+                --text-color: #34495e;
+                --header-color: #2c3e50;
+                --border-color: #bdc3c7;
+                --hover-color: #3498db;
+            }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                background-color: var(--background-color);
+                color: var(--text-color);
+                line-height: 1.6;
+            }
+            header {
+                background-color: var(--primary-color);
+                color: white;
+                padding: 1.5em;
+                text-align: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            nav {
+                background: var(--secondary-color);
+                padding: 1em;
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+            }
+            nav ul {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            nav a {
+                color: white;
+                text-decoration: none;
+                padding: 0.5em 1em;
+                border-radius: 5px;
+                transition: background-color 0.3s;
+            }
+            nav a:hover {
+                background-color: #2980b9;
+            }
+            .container {
+                background: var(--container-bg);
+                margin: 2em;
+                padding: 2em;
+                border-radius: 8px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            }
+            .module {
+                margin-bottom: 2em;
+                padding-top: 60px; /* Offset for sticky nav */
+                margin-top: -60px; /* Counteract padding */
+            }
+            h1, h2 {
+                color: var(--header-color);
+                border-bottom: 3px solid var(--secondary-color);
+                padding-bottom: 8px;
+            }
+            .code {
+                background: #2d2d2d;
+                color: #f1f1f1;
+                padding: 1em;
+                border-radius: 5px;
+                font-family: 'Courier New', Courier, monospace;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 1em;
+            }
+            th, td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid var(--border-color);
+            }
+            th {
+                background-color: #eaf2f8;
+                font-weight: bold;
+            }
+            tr:hover { background-color: #f2f2f2; }
+            ul { list-style: inside square; padding-left: 0; }
+            li { margin-bottom: 0.5em; }
         </style>
     </head>
     <body>
-        <div class="container">
+        <header>
             <h1>ReconX Scan Report</h1>
+        </header>
     """
+
+    # --- Navigation ---
+    nav_links = []
+    if ai_summary:
+        nav_links.append(f'<li><a href="#{module_id("AI Summary")}">AI Summary</a></li>')
+    if 'nmap' in data and data.get('nmap'):
+        nav_links.append(f'<li><a href="#{module_id("Nmap")}">Nmap</a></li>')
+    if 'urlscan' in data and data.get('urlscan'):
+        nav_links.append(f'<li><a href="#{module_id("URLScan")}">URLScan</a></li>')
+    if 'subenum' in data and data.get('subenum'):
+        nav_links.append(f'<li><a href="#{module_id("Passive Subdomains")}">Passive Subdomains</a></li>')
+    if 'subfuzz' in data and data.get('subfuzz'):
+        nav_links.append(f'<li><a href="#{module_id("Bruteforce Subdomains")}">Bruteforce Subdomains</a></li>')
+    if 'dirfuzz' in data and data.get('dirfuzz'):
+        nav_links.append(f'<li><a href="#{module_id("Directories")}">Directories</a></li>')
+    if 'whatweb' in data and data.get('whatweb'):
+        nav_links.append(f'<li><a href="#{module_id("Web Tech")}">Web Tech</a></li>')
+
+    if nav_links:
+        html += "<nav><ul>" + "".join(nav_links) + "</ul></nav>"
+
+    html += '<div class="container">'
 
     if ai_summary:
         html += f"""
-        <div class="module">
+        <div id="{module_id("AI Summary")}" class="module">
             <h2>AI-Powered Summary</h2>
             <div class="code">{ai_summary.replace('\\n', '<br>')}</div>
         </div>
         """
 
     if 'nmap' in data and data.get('nmap'):
-        html += '<div class="module"><h2>Nmap Results</h2>'
+        html += f'<div id="{module_id("Nmap")}" class="module"><h2>Nmap Results</h2>'
         for host in data['nmap']:
             html += f"<h3>Host: {host['ip']}</h3><table><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>Version</th></tr>"
             for port in host['ports']:
@@ -181,7 +293,7 @@ def save_html_report(data, output_dir, ai_summary=None):
         html += '</div>'
 
     if 'urlscan' in data and data.get('urlscan'):
-        html += '<div class="module"><h2>URLScan.io Analysis</h2>'
+        html += f'<div id="{module_id("URLScan")}" class="module"><h2>URLScan.io Analysis</h2>'
         if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
             html += f"<h3>Technologies</h3><ul>{''.join(f'<li>{tech}</li>' for tech in data['urlscan']['technologies'])}</ul>"
         if 'ips' in data['urlscan'] and data['urlscan']['ips']:
@@ -191,25 +303,25 @@ def save_html_report(data, output_dir, ai_summary=None):
         html += '</div>'
 
     if 'subenum' in data and data.get('subenum'):
-        html += '<div class="module"><h2>Discovered Subdomains (Passive)</h2><ul>'
+        html += f'<div id="{module_id("Passive Subdomains")}" class="module"><h2>Discovered Subdomains (Passive)</h2><ul>'
         for sub in data['subenum']:
             html += f"<li>{sub}</li>"
         html += '</ul></div>'
 
     if 'subfuzz' in data and data.get('subfuzz'):
-        html += '<div class="module"><h2>Discovered Subdomains (Bruteforce)</h2><ul>'
+        html += f'<div id="{module_id("Bruteforce Subdomains")}" class="module"><h2>Discovered Subdomains (Bruteforce)</h2><ul>'
         for sub in data['subfuzz']:
             html += f"<li>{sub}</li>"
         html += '</ul></div>'
 
     if 'dirfuzz' in data and data.get('dirfuzz'):
-        html += '<div class="module"><h2>Discovered Directories</h2><ul>'
+        html += f'<div id="{module_id("Directories")}" class="module"><h2>Discovered Directories</h2><ul>'
         for d in data['dirfuzz']:
             html += f"<li>{d}</li>"
         html += '</ul></div>'
 
     if 'whatweb' in data and data.get('whatweb'):
-        html += '<div class="module"><h2>Web Technologies</h2>'
+        html += f'<div id="{module_id("Web Tech")}" class="module"><h2>Web Technologies</h2>'
         for tech in data['whatweb']:
             html += f"<h3>{tech.get('target')}</h3><ul>"
             for plugin, info in tech.get('plugins', {}).items():

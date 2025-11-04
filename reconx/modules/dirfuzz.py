@@ -1,29 +1,36 @@
 import subprocess
 import os
+import json
 
 class DirectoryFuzzer:
-    def __init__(self, target, profile, wordlist, threads, output_dir, gobuster_args=''):
-        self.target = target
+    def __init__(self, target, profile, wordlist, threads, output_dir, ffuf_args=''):
+        if not target.startswith(('http://', 'https://')):
+            self.target = f"http://{target}"
+        else:
+            self.target = target
+
         self.profile = profile
         self.wordlist = wordlist
         self.threads = threads
         self.output_dir = output_dir
-        self.gobuster_args = gobuster_args
-        self.output_file = os.path.join(self.output_dir, 'dirfuzz.txt')
+        self.ffuf_args = ffuf_args
+        self.output_file = os.path.join(self.output_dir, 'dirfuzz.json')
         self.log_file = os.path.join(self.output_dir, 'dirfuzz.log')
 
         if not self.wordlist:
             if self.profile == 'fast':
-                # Use a smaller wordlist for a faster scan
                 self.wordlist = '/usr/share/wordlists/dirb/common.txt'
             else:
                 self.wordlist = '/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt'
 
     def get_command(self):
-        base_cmd = f'gobuster dir -u {self.target} -w {self.wordlist} -t {self.threads} -o {self.output_file}'
+        url = self.target if self.target.endswith('/') else self.target + '/'
+        url += 'FUZZ'
 
-        if self.gobuster_args:
-            base_cmd += f' {self.gobuster_args}'
+        base_cmd = f'ffuf -u {url} -w {self.wordlist} -t {self.threads} -o {self.output_file} -of json'
+
+        if self.ffuf_args:
+            base_cmd += f' {self.ffuf_args}'
 
         return base_cmd.split()
 
@@ -33,25 +40,24 @@ class DirectoryFuzzer:
             result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
 
             with open(self.log_file, 'w') as f:
-                f.write("--- GOBUSter STDOUT ---\n")
+                f.write("--- FFUF STDOUT ---\n")
                 f.write(result.stdout)
-                f.write("\n--- GOBUSter STDERR ---\n")
+                f.write("\n--- FFUF STDERR ---\n")
                 f.write(result.stderr)
 
-            # Check for common errors in stderr, even if the process doesn't fail
-            if 'error connecting to' in result.stderr.lower():
-                 return {'error': f"Error running Gobuster: {result.stderr}"}
+            if result.returncode != 0 and "ERROR" in result.stderr.upper():
+                 return {'error': f"Error running ffuf: {result.stderr}"}
 
             return self.parse_results()
 
         except FileNotFoundError:
-            return {'error': "'gobuster' command not found. Make sure it's installed and in your PATH."}
+            return {'error': "'ffuf' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
-            return {'error': f"Gobuster scan timed out after {timeout} seconds. Check dirfuzz.log for partial results."}
+            return {'error': f"ffuf scan timed out after {timeout} seconds. Check dirfuzz.log for partial results."}
         except Exception as e:
             with open(self.log_file, 'w') as f:
                 f.write(f"An unexpected error occurred: {e}\n")
-            return {'error': f"An unexpected error occurred with Gobuster: {e}"}
+            return {'error': f"An unexpected error occurred with ffuf: {e}"}
 
     def parse_results(self):
         try:
@@ -59,11 +65,11 @@ class DirectoryFuzzer:
                 return []
 
             with open(self.output_file, 'r') as f:
-                results = [line.split(' ')[0] for line in f if line.strip()]
-            return results
-        except FileNotFoundError:
-            return {'error': f"Gobuster output file not found: {self.output_file}"}
+                data = json.load(f)
+            return [result.get('url') for result in data.get('results', [])]
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return {'error': f"Error parsing ffuf JSON output: {e}"}
 
-def run(target, profile, wordlist, threads, output_dir, gobuster_args):
-    fuzzer = DirectoryFuzzer(target, profile, wordlist, threads, output_dir, gobuster_args)
+def run(target, profile, wordlist, threads, output_dir, ffuf_args):
+    fuzzer = DirectoryFuzzer(target, profile, wordlist, threads, output_dir, ffuf_args)
     return fuzzer.run_scan()

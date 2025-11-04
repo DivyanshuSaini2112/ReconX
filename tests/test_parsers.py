@@ -1,7 +1,7 @@
 import unittest
 import os
 import shutil
-from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, ffuf
+from reconx.modules import nmap, subenum, dirfuzz, whatweb, nuclei
 
 class TestParsers(unittest.TestCase):
 
@@ -37,11 +37,11 @@ class TestParsers(unittest.TestCase):
 
     def test_dirfuzz_parser(self):
         scanner = dirfuzz.DirectoryFuzzer('http://example.com', 'default', None, 10, self.output_dir)
-        scanner.output_file = self.sample_dirfuzz_file
+        scanner.output_file = 'tests/sample_dirfuzz.json'
         parsed_data = scanner.parse_results()
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 3)
-        self.assertIn('/admin', parsed_data)
+        self.assertIn('http://example.com/admin', parsed_data)
 
     def test_whatweb_parser(self):
         scanner = whatweb.WhatWebScanner('http://example.com', self.output_dir)
@@ -52,22 +52,13 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(parsed_data[0]['target'], 'http://example.com')
         self.assertIn('Apache', parsed_data[0]['plugins'])
 
-    def test_nikto_parser(self):
-        scanner = nikto.NiktoScanner('http://example.com', 'default', self.output_dir)
-        scanner.output_file = self.sample_nikto_file
+    def test_nuclei_parser(self):
+        scanner = nuclei.NucleiScanner('http://example.com', 'default', self.output_dir)
+        scanner.output_file = 'tests/sample_nuclei.json'
         parsed_data = scanner.parse_results()
         self.assertIsNotNone(parsed_data)
-        self.assertEqual(len(parsed_data), 3)
-        self.assertTrue(any('X-Frame-Options' in s for s in parsed_data))
-
-    def test_ffuf_parser(self):
-        scanner = ffuf.FfufFuzzer('http://example.com', None, 10, self.output_dir)
-        scanner.output_file = self.sample_ffuf_file
-        parsed_data = scanner.parse_results()
-        self.assertIsNotNone(parsed_data)
-        self.assertEqual(len(parsed_data), 2)
-        self.assertIn('admin', parsed_data)
-        self.assertIn('images', parsed_data)
+        self.assertEqual(len(parsed_data), 1)
+        self.assertEqual(parsed_data[0]['info']['name'], 'Test CVE')
 
     def tearDown(self):
         if os.path.exists(self.output_dir):

@@ -7,7 +7,7 @@ import threading
 import tty
 import termios
 import select
-from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, sqlmap, ffuf, subfuzz, urlscan
+from reconx.modules import nmap, subenum, dirfuzz, whatweb, nuclei, sqlmap, subfuzz, urlscan
 from reconx.lib import output
 from rich.console import Console
 from rich.panel import Panel
@@ -23,14 +23,11 @@ def run_module(module_name, args, output_dir, timeout):
     elif module_name == 'subenum':
         scanner = subenum.SubdomainScanner(args.target, output_dir)
     elif module_name == 'dirfuzz':
-        if args.fuzzer == 'ffuf':
-            scanner = ffuf.FfufFuzzer(args.target, args.wordlist, args.threads, output_dir, args.ffuf_args)
-        else:
-            scanner = dirfuzz.DirectoryFuzzer(args.target, args.profile, args.wordlist, args.threads, output_dir, args.gobuster_args)
+        scanner = dirfuzz.DirectoryFuzzer(args.target, args.profile, args.wordlist, args.threads, output_dir, args.ffuf_args)
     elif module_name == 'whatweb':
         scanner = whatweb.WhatWebScanner(args.target, output_dir)
-    elif module_name == 'nikto':
-        scanner = nikto.NiktoScanner(args.target, args.profile, output_dir)
+    elif module_name == 'nuclei':
+        scanner = nuclei.NucleiScanner(args.target, args.profile, output_dir, args.nuclei_args)
     elif module_name == 'sqlmap':
         scanner = sqlmap.SqlmapScanner(args.target, output_dir)
     elif module_name == 'subfuzz':
@@ -82,17 +79,16 @@ def main():
 
     # ... (parser arguments are unchanged) ...
     parser.add_argument('-t', '--target', required=True, help='The target IP, domain, or CIDR.')
-    parser.add_argument('--modules', default='nmap,subenum,dirfuzz,whatweb,nikto,urlscan', help='Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz,subfuzz,urlscan).')
+    parser.add_argument('--modules', default='nmap,subenum,dirfuzz,whatweb,nuclei,urlscan', help='Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz,nuclei,urlscan).')
     parser.add_argument('--profile', choices=['fast', 'default', 'deep'], default='default', help='Scan profile. Note: fast profile may cause timeouts on some modules.')
     parser.add_argument('--threads', type=int, default=10, help='Number of concurrent threads for fuzzing/discovery.')
     parser.add_argument('--wordlist', help='Path to a custom wordlist for directory fuzzing.')
-    parser.add_argument('--fuzzer', choices=['gobuster', 'ffuf'], default='gobuster', help='Choose the directory fuzzer to use.')
     parser.add_argument('--out', default='./results', help='Directory to save results to.')
     parser.add_argument('--html', action='store_true', help='Generate an HTML report.')
     parser.add_argument('--ai-summary', action='store_true', help='Generate a summary using an AI model.')
     parser.add_argument('--nmap-args', help='Custom arguments for Nmap.', default='')
-    parser.add_argument('--gobuster-args', help='Custom arguments for Gobuster.', default='')
     parser.add_argument('--ffuf-args', help='Custom arguments for ffuf.', default='')
+    parser.add_argument('--nuclei-args', help='Custom arguments for Nuclei.', default='')
     parser.add_argument('--sqlmap', action='store_true', help='Explicitly enable the SQLMap module.')
     parser.add_argument('--no-exec', action='store_true', help='Print planned commands without executing them.')
 

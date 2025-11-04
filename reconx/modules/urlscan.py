@@ -158,7 +158,12 @@ class UrlScanScanner:
         if data.get('data', {}).get('requests'):
             html += "<h2>Network Requests</h2><table><tr><th>URL</th><th>Status</th><th>Content-Type</th></tr>"
             for req in data['data']['requests']:
-                html += f"<tr><td class='code'>{req.get('request', {}).get('url', '')}</td><td>{req.get('response', {}).get('status', 'N/A')}</td><td>{req.get('response', {}).get('headers', {}).get('content-type', ['N/A'])[0]}</td></tr>"
+                response_headers = req.get('response', {}).get('headers', {})
+                content_type = response_headers.get('content-type', 'N/A')
+                if isinstance(content_type, list):
+                    content_type = content_type[0] if content_type else 'N/A'
+
+                html += f"<tr><td class='code'>{req.get('request', {}).get('url', '')}</td><td>{req.get('response', {}).get('status', 'N/A')}</td><td>{content_type}</td></tr>"
             html += "</table>"
 
         html += """
