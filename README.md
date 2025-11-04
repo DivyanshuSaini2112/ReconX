@@ -92,21 +92,6 @@ cp config.ini.example config.ini
 # Edit config.ini with your API keys
 ```
 
-**For AI Summaries** (Optional):
-
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull a model
-ollama pull llama3
-
-# Start Ollama server
-ollama serve
-```
-
----
-
 ## 📖 Usage
 
 ### Basic Syntax
