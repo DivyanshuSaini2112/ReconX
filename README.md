@@ -600,7 +600,7 @@ of this software and associated documentation files...
 
 [![GitHub](https://img.shields.io/badge/GitHub-DivyanshuSaini2112-181717?style=for-the-badge&logo=github)](https://github.com/DivyanshuSaini2112)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/divyanshusaini2112)
-[![Twitter](https://img.shields.io/badge/Twitter-Follow-1DA1F2?style=for-the-badge&logo=twitter)](https://twitter.com/divyanshusaini)
+[![Twitter](https://img.shields.io/badge/Twitter-Follow-1DA1F2?style=for-the-badge&logo=twitter)](https://x.com/DivyanshuS72153)
 
 ### Support the Project
 
