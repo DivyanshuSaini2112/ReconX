@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🎯 ReconX
+<img src="image_2025-11-16_214219972.png" alt="ReconX Logo" width="180"/>
+
+# ReconX
 
 ### Next-Generation Automated Reconnaissance Framework
 
@@ -19,6 +21,7 @@
 ---
 
 </div>
+
 
 ## 📋 Overview
 
