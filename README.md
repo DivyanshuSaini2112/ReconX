@@ -1,22 +1,27 @@
 <div align="center">
 
-<img src="image_2025-11-16_214219972.png" alt="ReconX Logo" width="180"/>
+<!-- Banner -->
+<img src="./reconx-github-banner.svg" alt="ReconX Banner" width="100%" />
 
 # ReconX
 
-### Next-Generation Automated Reconnaissance Framework
+### ⚡ Next-Generation Automated Reconnaissance Framework
 
+<!-- Badges -->
 <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge&logo=semver&logoColor=white" alt="Version">
 <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
 <img src="https://img.shields.io/badge/Platform-Kali%20Linux-557C94?style=for-the-badge&logo=kalilinux&logoColor=white" alt="Platform">
 <img src="https://img.shields.io/badge/License-MIT-00C853?style=for-the-badge&logo=opensourceinitiative&logoColor=white" alt="License">
 
+<br/>
+
+<!-- Social Badges -->
 <img src="https://img.shields.io/github/stars/DivyanshuSaini2112/recony?style=social" alt="Stars">
 <img src="https://img.shields.io/github/forks/DivyanshuSaini2112/recony?style=social" alt="Forks">
 
 ---
 
-**[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Documentation](#-documentation) • [Contributing](#-contributing)**
+### **[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Documentation](#-documentation) • [Contributing](#-contributing)**
 
 ---
 
