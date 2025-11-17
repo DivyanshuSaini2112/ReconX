@@ -544,17 +544,6 @@ We welcome contributions from the community! Here's how you can help:
 
 ---
 
-## 📖 Documentation
-
-### Additional Resources
-
-- **[Wiki](https://github.com/DivyanshuSaini2112/recony/wiki)** - Comprehensive guides and tutorials
-- **[API Documentation](https://github.com/DivyanshuSaini2112/recony/wiki/API)** - Module development guide
-- **[FAQ](https://github.com/DivyanshuSaini2112/recony/wiki/FAQ)** - Frequently asked questions
-- **[Troubleshooting](https://github.com/DivyanshuSaini2112/recony/wiki/Troubleshooting)** - Common issues and solutions
-
----
-
 ## 🙏 Acknowledgments
 
 ReconX stands on the shoulders of giants. Special thanks to:
