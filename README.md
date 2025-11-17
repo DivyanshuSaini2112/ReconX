@@ -243,9 +243,8 @@ nano config.ini
 **config.ini structure:**
 ```ini
 [API_KEYS]
-urlscan_api_key = your_urlscan_api_key_here
-shodan_api_key = your_shodan_api_key_here
-virustotal_api_key = your_virustotal_api_key_here
+URLSCAN_API_KEY = YOUR_URLSCAN_API_KEY
+GROQ_API_KEY = YOUR_GROQ_API_KEY
 ```
 
 ---
