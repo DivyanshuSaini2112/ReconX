@@ -1,5 +1,6 @@
 import subprocess
 import os
+from reconx.lib.utils import run_command_streaming
 
 class DirectoryFuzzer:
     def __init__(self, target, wordlist, threads, output_dir, gobuster_args=''):
@@ -19,31 +20,23 @@ class DirectoryFuzzer:
 
         return base_cmd.split()
 
-    def run_scan(self, timeout=None):
+    def run_scan(self, timeout=None, status_callback=None):
         command = self.get_command()
-        try:
-            result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+        stderr_file = self.log_file + ".stderr"
 
-            with open(self.log_file, 'w') as f:
-                f.write("--- GOBUSter STDOUT ---\n")
-                f.write(result.stdout)
-                f.write("\n--- GOBUSter STDERR ---\n")
-                f.write(result.stderr)
+        # run_command_streaming writes STDOUT to self.log_file.
+        # Gobuster writes findings to self.output_file (-o flag).
+        result = run_command_streaming(command, self.log_file, stderr_file, status_callback, timeout)
 
-            # Check for common errors in stderr, even if the process doesn't fail
-            if 'error connecting to' in result.stderr.lower():
-                 return {'error': f"Error running Gobuster: {result.stderr}"}
+        if result and 'error' in result:
+            # Attempt to parse partial results on timeout
+            if "timed out" in result['error']:
+                partial = self.parse_results()
+                if isinstance(partial, list) and partial:
+                    return partial
+            return result
 
-            return self.parse_results()
-
-        except FileNotFoundError:
-            return {'error': "'gobuster' command not found. Make sure it's installed and in your PATH."}
-        except subprocess.TimeoutExpired:
-            return {'error': f"Gobuster scan timed out after {timeout} seconds. Check dirfuzz.log for partial results."}
-        except Exception as e:
-            with open(self.log_file, 'w') as f:
-                f.write(f"An unexpected error occurred: {e}\n")
-            return {'error': f"An unexpected error occurred with Gobuster: {e}"}
+        return self.parse_results()
 
     def parse_results(self):
         try:

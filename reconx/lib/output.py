@@ -324,67 +324,95 @@ def save_html_report(data, output_dir, ai_summary=None):
     # NMAP SECTION
     if 'nmap' in data and data.get('nmap'):
         html += '<div id="nmap" class="section"><div class="card"><h2>Nmap Port Scan</h2>'
-        for host in data['nmap']:
-            html += f"<h3>Host: {host['ip']}</h3><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>Version</th></tr></thead><tbody>"
-            for port in host['ports']:
-                if port['state'] == 'open':
-                    service = port.get('service', {})
-                    html += f"<tr><td><span class='badge badge-port'>{port['portid']}</span></td><td>{port['protocol']}</td><td>{service.get('name', 'N/A')}</td><td>{service.get('product', 'N/A')}</td><td>{service.get('version', 'N/A')}</td></tr>"
-            html += "</tbody></table>"
+        if isinstance(data['nmap'], dict) and 'error' in data['nmap']:
+            html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["nmap"]["error"]}</div>'
+        else:
+            for host in data['nmap']:
+                html += f"<h3>Host: {host['ip']}</h3><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>Version</th></tr></thead><tbody>"
+                for port in host['ports']:
+                    if port['state'] == 'open':
+                        service = port.get('service', {})
+                        html += f"<tr><td><span class='badge badge-port'>{port['portid']}</span></td><td>{port['protocol']}</td><td>{service.get('name', 'N/A')}</td><td>{service.get('product', 'N/A')}</td><td>{service.get('version', 'N/A')}</td></tr>"
+                html += "</tbody></table>"
         html += '</div></div>'
 
     # DIRFUZZ SECTION
     if 'dirfuzz' in data and data.get('dirfuzz'):
         html += '<div id="dirfuzz" class="section"><div class="card"><h2>Directory Fuzzing Results</h2>'
-        html += '<div class="log-block">'
-        for d in data['dirfuzz']:
-            html += f"<div>{d}</div>"
-        html += '</div></div></div>'
+        if isinstance(data['dirfuzz'], dict) and 'error' in data['dirfuzz']:
+             html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["dirfuzz"]["error"]}</div>'
+        else:
+            html += '<div class="log-block">'
+            for d in data['dirfuzz']:
+                html += f"<div>{d}</div>"
+            html += '</div>'
+        html += '</div></div>'
 
     # NIKTO SECTION
     if 'nikto' in data and data.get('nikto'):
-        html += '<div id="nikto" class="section"><div class="card"><h2>Nikto Vulnerability Scan</h2><ul>'
-        for finding in data['nikto']:
-            html += f"<li style='margin-bottom: 10px;'><span class='finding-high'>{finding}</span></li>"
-        html += '</ul></div></div>'
+        html += '<div id="nikto" class="section"><div class="card"><h2>Nikto Vulnerability Scan</h2>'
+        if isinstance(data['nikto'], dict) and 'error' in data['nikto']:
+             html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["nikto"]["error"]}</div>'
+        else:
+            html += '<ul>'
+            for finding in data['nikto']:
+                html += f"<li style='margin-bottom: 10px;'><span class='finding-high'>{finding}</span></li>"
+            html += '</ul>'
+        html += '</div></div>'
 
     # SUBENUM SECTION
     if 'subenum' in data and data.get('subenum'):
-        html += '<div id="subenum" class="section"><div class="card"><h2>Discovered Subdomains (Passive)</h2><ul>'
-        for sub in data['subenum']:
-            html += f"<li><a href='http://{sub}' target='_blank'>{sub}</a></li>"
-        html += '</ul></div></div>'
+        html += '<div id="subenum" class="section"><div class="card"><h2>Discovered Subdomains (Passive)</h2>'
+        if isinstance(data['subenum'], dict) and 'error' in data['subenum']:
+             html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["subenum"]["error"]}</div>'
+        else:
+            html += '<ul>'
+            for sub in data['subenum']:
+                html += f"<li><a href='http://{sub}' target='_blank'>{sub}</a></li>"
+            html += '</ul>'
+        html += '</div></div>'
 
     # SUBFUZZ SECTION
     if 'subfuzz' in data and data.get('subfuzz'):
-        html += '<div id="subfuzz" class="section"><div class="card"><h2>Discovered Subdomains (Bruteforce)</h2><ul>'
-        for sub in data['subfuzz']:
-            html += f"<li><a href='http://{sub}' target='_blank'>{sub}</a></li>"
-        html += '</ul></div></div>'
+        html += '<div id="subfuzz" class="section"><div class="card"><h2>Discovered Subdomains (Bruteforce)</h2>'
+        if isinstance(data['subfuzz'], dict) and 'error' in data['subfuzz']:
+             html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["subfuzz"]["error"]}</div>'
+        else:
+            html += '<ul>'
+            for sub in data['subfuzz']:
+                html += f"<li><a href='http://{sub}' target='_blank'>{sub}</a></li>"
+            html += '</ul>'
+        html += '</div></div>'
 
     # WHATWEB SECTION
     if 'whatweb' in data and data.get('whatweb'):
         html += '<div id="whatweb" class="section"><div class="card"><h2>Web Technologies</h2>'
-        for tech in data['whatweb']:
-            html += f"<h3>{tech.get('target')}</h3><div style='display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;'>"
-            for plugin, info in tech.get('plugins', {}).items():
-                details = []
-                if 'version' in info and info['version']:
-                    details.append(f"v{', '.join(map(str, info['version']))}")
-                details_str = f" ({' '.join(details)})" if details else ""
-                html += f"<div style='background: #eee; padding: 10px; border-radius: 5px;'><b>{plugin}</b>{details_str}</div>"
-            html += "</div>"
+        if isinstance(data['whatweb'], dict) and 'error' in data['whatweb']:
+             html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["whatweb"]["error"]}</div>'
+        else:
+            for tech in data['whatweb']:
+                html += f"<h3>{tech.get('target')}</h3><div style='display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;'>"
+                for plugin, info in tech.get('plugins', {}).items():
+                    details = []
+                    if 'version' in info and info['version']:
+                        details.append(f"v{', '.join(map(str, info['version']))}")
+                    details_str = f" ({' '.join(details)})" if details else ""
+                    html += f"<div style='background: #eee; padding: 10px; border-radius: 5px;'><b>{plugin}</b>{details_str}</div>"
+                html += "</div>"
         html += '</div></div>'
 
     # URLSCAN SECTION
     if 'urlscan' in data and data.get('urlscan'):
         html += '<div id="urlscan" class="section"><div class="card"><h2>URLScan.io Analysis</h2>'
-        if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
-            html += f"<h3>Technologies</h3><div style='display: flex; flex-wrap: wrap; gap: 10px;'>{''.join(f'<span class=\"badge\" style=\"background: #555;\">{tech}</span>' for tech in data['urlscan']['technologies'])}</div>"
-        if 'ips' in data['urlscan'] and data['urlscan']['ips']:
-            html += f"<h3>IPs</h3><ul>{''.join(f'<li>{ip}</li>' for ip in data['urlscan']['ips'])}</ul>"
-        if 'domains' in data['urlscan'] and data['urlscan']['domains']:
-            html += f"<h3>Related Domains</h3><ul>{''.join(f'<li>{domain}</li>' for domain in data['urlscan']['domains'])}</ul>"
+        if isinstance(data['urlscan'], dict) and 'error' in data['urlscan']:
+             html += f'<div style="background: #fee; color: #c0392b; padding: 15px; border-radius: 4px; border-left: 5px solid #c0392b;"><strong>Error:</strong> {data["urlscan"]["error"]}</div>'
+        else:
+            if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
+                html += f"<h3>Technologies</h3><div style='display: flex; flex-wrap: wrap; gap: 10px;'>{''.join(f'<span class=\"badge\" style=\"background: #555;\">{tech}</span>' for tech in data['urlscan']['technologies'])}</div>"
+            if 'ips' in data['urlscan'] and data['urlscan']['ips']:
+                html += f"<h3>IPs</h3><ul>{''.join(f'<li>{ip}</li>' for ip in data['urlscan']['ips'])}</ul>"
+            if 'domains' in data['urlscan'] and data['urlscan']['domains']:
+                html += f"<h3>Related Domains</h3><ul>{''.join(f'<li>{domain}</li>' for domain in data['urlscan']['domains'])}</ul>"
         html += '</div></div>'
 
     html += """

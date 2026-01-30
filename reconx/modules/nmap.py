@@ -1,6 +1,7 @@
 import subprocess
 import xml.etree.ElementTree as ET
 import os
+from reconx.lib.utils import run_command_streaming
 
 class NmapScanner:
     def __init__(self, target, profile, output_dir, nmap_args=''):
@@ -18,17 +19,23 @@ class NmapScanner:
             f"Stage 2 (Detailed Scan): nmap -p <open_ports> [profile_args] -oX {self.output_file} {self.target}"
         ]
 
-    def _run_quick_scan(self, timeout):
+    def _run_quick_scan(self, timeout, status_callback=None):
         """Runs a fast scan to discover open ports."""
         command = ['nmap', '-T4', '-F', '-oX', self.quick_scan_file, self.target]
-        try:
-            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
-            return self._parse_open_ports()
-        except FileNotFoundError:
-            raise
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-            # Pass the original exception up
-            raise e
+        log_file = os.path.join(self.output_dir, 'nmap_quick.log')
+        stderr_file = os.path.join(self.output_dir, 'nmap_quick.err')
+
+        if status_callback:
+            status_callback("Starting Quick Scan...")
+
+        result = run_command_streaming(command, log_file, stderr_file, status_callback, timeout)
+
+        if result and 'error' in result:
+             if "timed out" in result['error']:
+                 raise subprocess.TimeoutExpired(command, timeout)
+             raise Exception(result['error'])
+
+        return self._parse_open_ports()
 
     def _parse_open_ports(self):
         """Parses the quick scan XML to find open ports."""
@@ -43,10 +50,10 @@ class NmapScanner:
         except (ET.ParseError, FileNotFoundError):
             return []
 
-    def run_scan(self, timeout=None):
+    def run_scan(self, timeout=None, status_callback=None):
         try:
             # Stage 1: Quick Scan
-            open_ports = self._run_quick_scan(timeout)
+            open_ports = self._run_quick_scan(timeout, status_callback)
 
             if not open_ports:
                 return {'message': 'No open ports found in the initial scan.'}
@@ -66,7 +73,19 @@ class NmapScanner:
                 detailed_cmd.extend(self.nmap_args.split())
             detailed_cmd.append(self.target)
 
-            subprocess.run(detailed_cmd, check=True, capture_output=True, text=True, timeout=timeout)
+            log_file = os.path.join(self.output_dir, 'nmap_detailed.log')
+            stderr_file = os.path.join(self.output_dir, 'nmap_detailed.err')
+
+            if status_callback:
+                status_callback(f"Running Detailed Scan on {len(open_ports)} ports...")
+
+            result = run_command_streaming(detailed_cmd, log_file, stderr_file, status_callback, timeout)
+
+            if result and 'error' in result:
+                if "timed out" in result['error']:
+                    # Try to parse whatever we have
+                    return self.parse_results()
+                return result
 
             return self.parse_results()
 
@@ -74,11 +93,14 @@ class NmapScanner:
             return {'error': "'nmap' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
             return {'error': f"Nmap scan timed out after {timeout} seconds."}
-        except subprocess.CalledProcessError as e:
-            return {'error': f"Error running Nmap: {e.stderr}"}
+        except Exception as e:
+            return {'error': f"Error running Nmap: {str(e)}"}
 
     def parse_results(self):
         try:
+            if not os.path.exists(self.output_file) or os.path.getsize(self.output_file) == 0:
+                return None
+
             tree = ET.parse(self.output_file)
             root = tree.getroot()
 
@@ -119,8 +141,8 @@ class NmapScanner:
 
             return hosts
         except ET.ParseError as e:
-            print(f"[!] Error parsing Nmap XML output: {e}")
-            return None
+            # print(f"[!] Error parsing Nmap XML output: {e}")
+            return {'error': f"Error parsing Nmap XML: {e}"}
         except FileNotFoundError:
-            print(f"[!] Nmap output file not found: {self.output_file}")
-            return None
+            # print(f"[!] Nmap output file not found: {self.output_file}")
+            return {'error': f"Nmap output file not found: {self.output_file}"}

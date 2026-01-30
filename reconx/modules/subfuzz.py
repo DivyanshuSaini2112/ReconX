@@ -1,6 +1,7 @@
 import subprocess
 import os
 import json
+from reconx.lib.utils import run_command_streaming
 
 class SubdomainFuzzer:
     def __init__(self, target, wordlist, threads, output_dir, ffuf_args=''):
@@ -20,25 +21,21 @@ class SubdomainFuzzer:
 
         return base_cmd.split()
 
-    def run_scan(self, timeout=None):
+    def run_scan(self, timeout=None, status_callback=None):
         command = self.get_command()
-        try:
-            result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
-            if result.stderr:
-                with open(os.path.join(self.output_dir, 'ffuf_subfuzz.log'), 'w') as f:
-                    f.write(result.stderr)
+        log_file = os.path.join(self.output_dir, 'subfuzz.log')
+        stderr_file = os.path.join(self.output_dir, 'subfuzz.err')
 
-            return self.parse_results()
-        except FileNotFoundError:
-            return {'error': "'ffuf' command not found. Make sure it's installed and in your PATH."}
-        except subprocess.TimeoutExpired:
-            return {'error': f"Subdomain fuzzing timed out after {timeout} seconds."}
-        except subprocess.CalledProcessError as e:
-            # ffuf exits with status 1 when no results are found, so we check the stderr
-            if "Could not resolve host" in e.stderr:
-                 return {'error': f"Error running ffuf: Could not resolve host {self.target}"}
-            # For other errors, return the stderr
-            return {'error': f"Error running ffuf for subdomain fuzzing: {e.stderr}"}
+        result = run_command_streaming(command, log_file, stderr_file, status_callback, timeout)
+
+        if result and 'error' in result:
+             if "timed out" in result['error']:
+                 partial = self.parse_results()
+                 if isinstance(partial, list) and partial:
+                     return partial
+             return result
+
+        return self.parse_results()
 
 
     def parse_results(self):

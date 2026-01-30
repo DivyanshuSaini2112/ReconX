@@ -1,5 +1,6 @@
 import subprocess
 import os
+from reconx.lib.utils import run_command_streaming
 
 class SubdomainScanner:
     def __init__(self, target, output_dir):
@@ -10,26 +11,23 @@ class SubdomainScanner:
     def get_command(self):
         return ['subfinder', '-d', self.target, '-o', self.output_file]
 
-    def run_scan(self, timeout=None):
+    def run_scan(self, timeout=None, status_callback=None):
         command = self.get_command()
-        try:
-            result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
-            if result.stderr:
-                # Subfinder often prints non-fatal errors to stderr
-                with open(os.path.join(self.output_dir, 'subfinder.log'), 'w') as f:
-                    f.write(result.stderr)
+        log_file = os.path.join(self.output_dir, 'subfinder.log')
+        stderr_file = os.path.join(self.output_dir, 'subfinder.err')
 
-            return self.parse_results()
-        except FileNotFoundError:
-            return {'error': "'subfinder' command not found. Make sure it's installed and in your PATH."}
-        except subprocess.TimeoutExpired:
-            return {'error': f"Subfinder scan timed out after {timeout} seconds."}
-        except subprocess.CalledProcessError as e:
-            return {'error': f"Error running Subfinder: {e.stderr}"}
+        result = run_command_streaming(command, log_file, stderr_file, status_callback, timeout)
+
+        if result and 'error' in result:
+             if "timed out" in result['error']:
+                 return self.parse_results()
+             return result
+
+        return self.parse_results()
 
     def parse_results(self):
         try:
-            if os.path.getsize(self.output_file) == 0:
+            if not os.path.exists(self.output_file) or os.path.getsize(self.output_file) == 0:
                 return []
 
             with open(self.output_file, 'r') as f:

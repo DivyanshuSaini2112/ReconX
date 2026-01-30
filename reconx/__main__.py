@@ -12,7 +12,7 @@ from rich.progress import Progress
 
 console = Console()
 
-def run_module(module_name, args, output_dir, timeout):
+def run_module(module_name, args, output_dir, timeout, status_callback=None):
     """Helper function to run a single scanner module with a timeout."""
     scanner = None
     if module_name == 'nmap':
@@ -41,7 +41,11 @@ def run_module(module_name, args, output_dir, timeout):
             return module_name, None
         else:
             # Pass timeout to the run_scan method
-            results = scanner.run_scan(timeout=timeout)
+            try:
+                results = scanner.run_scan(timeout=timeout, status_callback=status_callback)
+            except TypeError:
+                # Fallback for modules that don't support status_callback
+                results = scanner.run_scan(timeout=timeout)
             return module_name, results
     return module_name, None
 
@@ -117,8 +121,21 @@ def main():
             # Initialize tasks but don't start them immediately (start=False) so we can control it
             tasks = {name: progress.add_task(f"[cyan]Queued {name}...", visible=True, start=False) for name in enabled_modules}
 
+            def update_status(module_name, status_line):
+                """Callback to update the progress bar description."""
+                # Keep description reasonable length and escape brackets for Rich
+                status = status_line.strip().replace('[', '\\[').replace(']', '\\]')
+                if len(status) > 60:
+                    status = status[:57] + "..."
+                progress.update(tasks[module_name], description=f"[yellow]{module_name}: {status}")
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(enabled_modules)) as executor:
-                future_to_module = {executor.submit(run_module, name, args, output_dir, timeout): name for name in enabled_modules}
+                future_to_module = {}
+                for name in enabled_modules:
+                    # Create a closure to capture the module name for the callback
+                    cb = lambda line, n=name: update_status(n, line)
+                    future = executor.submit(run_module, name, args, output_dir, timeout, cb)
+                    future_to_module[future] = name
 
                 # Start all tasks
                 for name in tasks:

@@ -1,5 +1,6 @@
 import subprocess
 import os
+from reconx.lib.utils import run_command_streaming
 
 class NiktoScanner:
     def __init__(self, target, output_dir):
@@ -12,32 +13,20 @@ class NiktoScanner:
         # We use -o to specify the output file, and -Format txt is the default
         return ['nikto', '-h', self.target, '-o', self.output_file, '-Format', 'txt']
 
-    def run_scan(self, timeout=None):
+    def run_scan(self, timeout=None, status_callback=None):
         command = self.get_command()
-        try:
-            result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+        stderr_file = self.log_file + ".stderr"
 
-            with open(self.log_file, 'w') as f:
-                f.write("--- NIKTO STDOUT ---\n")
-                f.write(result.stdout)
-                f.write("\n--- NIKTO STDERR ---\n")
-                f.write(result.stderr)
+        result = run_command_streaming(command, self.log_file, stderr_file, status_callback, timeout)
 
-            # Nikto often exits with a non-zero status code, so we'll parse the output anyway
-            return self.parse_results()
+        if result and 'error' in result:
+             if "timed out" in result['error']:
+                 partial = self.parse_results()
+                 if isinstance(partial, list) and partial:
+                     return partial
+             return result
 
-        except FileNotFoundError:
-            return {'error': "'nikto' command not found. Make sure it's installed and in your PATH."}
-        except subprocess.TimeoutExpired:
-            # Even on timeout, Nikto might have written partial results
-            with open(self.log_file, 'a') as f:
-                f.write("\n--- TIMEOUT ERROR ---\n")
-                f.write(f"Nikto scan timed out after {timeout} seconds.")
-            return {'error': f"Nikto scan timed out after {timeout} seconds. Check nikto.log for partial results."}
-        except Exception as e:
-            with open(self.log_file, 'w') as f:
-                f.write(f"An unexpected error occurred: {e}\n")
-            return {'error': f"An unexpected error occurred with Nikto: {e}"}
+        return self.parse_results()
 
     def parse_results(self):
         try:
