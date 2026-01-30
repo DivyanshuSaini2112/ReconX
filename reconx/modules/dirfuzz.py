@@ -51,7 +51,7 @@ class DirectoryFuzzer:
                 return []
 
             with open(self.output_file, 'r') as f:
-                results = [line.split(' ')[0] for line in f if line.strip()]
+                results = [line.strip() for line in f if line.strip()]
             return results
         except FileNotFoundError:
             return {'error': f"Gobuster output file not found: {self.output_file}"}

@@ -3,6 +3,7 @@ import sys
 import os
 import datetime
 import concurrent.futures
+import time
 from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, sqlmap, ffuf, subfuzz, urlscan
 from reconx.lib import output
 from rich.console import Console
@@ -113,21 +114,38 @@ def main():
             run_module(module_name, args, output_dir, timeout)
     else:
         with Progress(console=console) as progress:
-            tasks = {name: progress.add_task(f"[cyan]Queued {name}...", visible=True) for name in enabled_modules}
+            # Initialize tasks but don't start them immediately (start=False) so we can control it
+            tasks = {name: progress.add_task(f"[cyan]Queued {name}...", visible=True, start=False) for name in enabled_modules}
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(enabled_modules)) as executor:
                 future_to_module = {executor.submit(run_module, name, args, output_dir, timeout): name for name in enabled_modules}
 
-                for future in concurrent.futures.as_completed(future_to_module):
-                    module_name = future_to_module[future]
-                    progress.update(tasks[module_name], description=f"[yellow]Running {module_name}...")
-                    try:
-                        _, module_results = future.result()
-                        if module_results:
-                            results[module_name] = module_results
-                        progress.update(tasks[module_name], completed=100, description=f"[green]Finished {module_name}")
-                    except Exception as exc:
-                        progress.update(tasks[module_name], description=f"[red]Error in {module_name}")
-                        console.print(f"\n[bold red]ERROR[/]: {module_name} generated an exception: {exc}")
+                # Start all tasks
+                for name in tasks:
+                    progress.start_task(tasks[name])
+                    progress.update(tasks[name], description=f"[yellow]Running {name}...")
+
+                # Poll for completion to keep UI responsive
+                completed_futures = set()
+                while len(completed_futures) < len(future_to_module):
+                    for future in future_to_module:
+                        if future in completed_futures:
+                            continue
+
+                        if future.done():
+                            module_name = future_to_module[future]
+                            completed_futures.add(future)
+
+                            try:
+                                _, module_results = future.result()
+                                if module_results:
+                                    results[module_name] = module_results
+                                progress.update(tasks[module_name], completed=100, description=f"[green]Finished {module_name}")
+                            except Exception as exc:
+                                progress.update(tasks[module_name], description=f"[red]Error in {module_name}")
+                                console.print(f"\n[bold red]ERROR[/]: {module_name} generated an exception: {exc}")
+
+                    time.sleep(0.1)
 
     console.print("\n--- Reconnaissance Complete ---")
 

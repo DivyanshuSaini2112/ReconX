@@ -41,7 +41,7 @@ class TestParsers(unittest.TestCase):
         parsed_data = scanner.parse_results()
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 3)
-        self.assertIn('/admin', parsed_data)
+        self.assertIn('/admin (Status: 301)', parsed_data)
 
     def test_whatweb_parser(self):
         scanner = whatweb.WhatWebScanner('http://example.com', self.output_dir)

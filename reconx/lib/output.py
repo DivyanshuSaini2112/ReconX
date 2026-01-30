@@ -3,6 +3,8 @@ import os
 from rich.table import Table
 from rich.console import Group
 from rich.text import Text
+import groq
+from .config import get_api_key
 
 def save_json_output(data, output_dir):
     """Saves the aggregated results to a JSON file."""
@@ -87,6 +89,14 @@ def generate_summary(data):
             table.add_row(sub)
         renderables.append(table)
 
+    # Nikto Results
+    if 'nikto' in data and data.get('nikto'):
+        table = Table(title="Nikto Vulnerabilities", style="red", title_style="bold red")
+        table.add_column("Finding", style="white")
+        for finding in data['nikto']:
+            table.add_row(finding)
+        renderables.append(table)
+
     # Action List
     if action_list:
         table = Table(title="Prioritized Action List", style="yellow", title_style="bold yellow")
@@ -134,10 +144,9 @@ def save_text_summary(data, output_dir):
     except IOError as e:
         print(f"[!] Error saving text summary: {e}")
 
-
-
 def save_html_report(data, output_dir, ai_summary=None):
-    """Generates and saves a self-contained HTML report."""
+    """Generates and saves a self-contained, interactive HTML report with a dashboard layout."""
+
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -146,84 +155,252 @@ def save_html_report(data, output_dir, ai_summary=None):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>ReconX Report</title>
         <style>
-            body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
-            h1, h2, h3 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
-            .container { background: #fff; padding: 2em; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-            .module { margin-bottom: 2em; }
-            .code { background: #eee; padding: 0.5em; border-radius: 3px; font-family: monospace; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
+            :root {
+                --primary-color: #2c3e50;
+                --secondary-color: #3498db;
+                --accent-color: #e74c3c;
+                --bg-color: #f4f6f9;
+                --text-color: #333;
+                --sidebar-width: 250px;
+            }
+            * { box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+            /* Sidebar */
+            .sidebar {
+                width: var(--sidebar-width);
+                background-color: var(--primary-color);
+                color: #ecf0f1;
+                display: flex;
+                flex-direction: column;
+                padding-top: 20px;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            }
+            .sidebar h2 {
+                text-align: center;
+                margin-bottom: 30px;
+                font-size: 1.5em;
+                letter-spacing: 1px;
+                border-bottom: 1px solid #34495e;
+                padding-bottom: 20px;
+            }
+            .nav-item {
+                padding: 15px 20px;
+                cursor: pointer;
+                transition: background 0.3s;
+                font-size: 1.1em;
+                border-left: 4px solid transparent;
+            }
+            .nav-item:hover {
+                background-color: #34495e;
+            }
+            .nav-item.active {
+                background-color: #34495e;
+                border-left: 4px solid var(--secondary-color);
+            }
+
+            /* Main Content */
+            .main-content {
+                flex: 1;
+                padding: 30px;
+                overflow-y: auto;
+            }
+            .section {
+                display: none;
+                animation: fadeIn 0.5s;
+            }
+            .section.active {
+                display: block;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            /* Card/Module Styles */
+            .card {
+                background: #fff;
+                padding: 25px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                margin-bottom: 25px;
+            }
+            h1, h2, h3 { color: var(--primary-color); }
+            h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+
+            /* Tables */
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+            th { background-color: #f8f9fa; font-weight: 600; color: var(--primary-color); }
+            tr:hover { background-color: #f9f9f9; }
+
+            /* Code/Log Blocks */
+            .log-block {
+                background: #2d3436;
+                color: #00cec9;
+                padding: 15px;
+                border-radius: 5px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                overflow-x: auto;
+                white-space: pre-wrap;
+            }
+            .finding-low { border-left: 4px solid #2ecc71; padding-left: 10px; }
+            .finding-med { border-left: 4px solid #f1c40f; padding-left: 10px; }
+            .finding-high { border-left: 4px solid #e74c3c; padding-left: 10px; }
+
+            /* Specific Module Styles */
+            .badge {
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 4px;
+                font-size: 0.85em;
+                font-weight: bold;
+                color: white;
+            }
+            .badge-port { background-color: var(--secondary-color); }
+            .badge-vuln { background-color: var(--accent-color); }
+
         </style>
     </head>
     <body>
-        <div class="container">
-            <h1>ReconX Scan Report</h1>
+        <div class="sidebar">
+            <h2>ReconX</h2>
+            <div class="nav-item active" onclick="showSection('overview')">Overview</div>
     """
 
+    # Dynamically build sidebar items based on available data
     if ai_summary:
-        html += f"""
-        <div class="module">
-            <h2>AI-Powered Summary</h2>
-            <div class="code">{ai_summary.replace('\\n', '<br>')}</div>
-        </div>
-        """
-
+        html += '<div class="nav-item" onclick="showSection(\'ai-summary\')">AI Summary</div>'
     if 'nmap' in data and data.get('nmap'):
-        html += '<div class="module"><h2>Nmap Results</h2>'
-        for host in data['nmap']:
-            html += f"<h3>Host: {host['ip']}</h3><table><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>Version</th></tr>"
-            for port in host['ports']:
-                if port['state'] == 'open':
-                    service = port.get('service', {})
-                    html += f"<tr><td>{port['portid']}</td><td>{port['protocol']}</td><td>{service.get('name', 'N/A')}</td><td>{service.get('product', 'N/A')}</td><td>{service.get('version', 'N/A')}</td></tr>"
-            html += "</table>"
-        html += '</div>'
-
-    if 'urlscan' in data and data.get('urlscan'):
-        html += '<div class="module"><h2>URLScan.io Analysis</h2>'
-        if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
-            html += f"<h3>Technologies</h3><ul>{''.join(f'<li>{tech}</li>' for tech in data['urlscan']['technologies'])}</ul>"
-        if 'ips' in data['urlscan'] and data['urlscan']['ips']:
-            html += f"<h3>IPs</h3><ul>{''.join(f'<li>{ip}</li>' for ip in data['urlscan']['ips'])}</ul>"
-        if 'domains' in data['urlscan'] and data['urlscan']['domains']:
-            html += f"<h3>Domains</h3><ul>{''.join(f'<li>{domain}</li>' for domain in data['urlscan']['domains'])}</ul>"
-        html += '</div>'
-
-    if 'subenum' in data and data.get('subenum'):
-        html += '<div class="module"><h2>Discovered Subdomains (Passive)</h2><ul>'
-        for sub in data['subenum']:
-            html += f"<li>{sub}</li>"
-        html += '</ul></div>'
-
-    if 'subfuzz' in data and data.get('subfuzz'):
-        html += '<div class="module"><h2>Discovered Subdomains (Bruteforce)</h2><ul>'
-        for sub in data['subfuzz']:
-            html += f"<li>{sub}</li>"
-        html += '</ul></div>'
-
+        html += '<div class="nav-item" onclick="showSection(\'nmap\')">Nmap Results</div>'
     if 'dirfuzz' in data and data.get('dirfuzz'):
-        html += '<div class="module"><h2>Discovered Directories</h2><ul>'
-        for d in data['dirfuzz']:
-            html += f"<li>{d}</li>"
-        html += '</ul></div>'
-
+        html += '<div class="nav-item" onclick="showSection(\'dirfuzz\')">Directory Fuzzing</div>'
+    if 'nikto' in data and data.get('nikto'):
+        html += '<div class="nav-item" onclick="showSection(\'nikto\')">Nikto Findings</div>'
+    if 'subenum' in data and data.get('subenum'):
+        html += '<div class="nav-item" onclick="showSection(\'subenum\')">Subdomains</div>'
+    if 'subfuzz' in data and data.get('subfuzz'):
+        html += '<div class="nav-item" onclick="showSection(\'subfuzz\')">Subdomain Fuzzing</div>'
     if 'whatweb' in data and data.get('whatweb'):
-        html += '<div class="module"><h2>Web Technologies</h2>'
-        for tech in data['whatweb']:
-            html += f"<h3>{tech.get('target')}</h3><ul>"
-            for plugin, info in tech.get('plugins', {}).items():
-                details = []
-                if 'version' in info and info['version']:
-                    details.append(f"Version: {', '.join(map(str, info['version']))}")
-                if 'string' in info and info['string']:
-                    details.append(f"Info: {', '.join(map(str, info['string']))}")
-                html += f"<li><b>{plugin}:</b> {' | '.join(details)}</li>"
-            html += "</ul>"
-        html += '</div>'
+        html += '<div class="nav-item" onclick="showSection(\'whatweb\')">Web Technologies</div>'
+    if 'urlscan' in data and data.get('urlscan'):
+        html += '<div class="nav-item" onclick="showSection(\'urlscan\')">URLScan.io</div>'
 
     html += """
         </div>
+        <div class="main-content">
+
+            <!-- OVERVIEW SECTION -->
+            <div id="overview" class="section active">
+                <div class="card">
+                    <h1>Scan Overview</h1>
+                    <p>Generated by ReconX</p>
+                    <p>Select a module from the sidebar to view detailed results.</p>
+                </div>
+            </div>
+    """
+
+    # AI SUMMARY SECTION
+    if ai_summary:
+        html += f"""
+            <div id="ai-summary" class="section">
+                <div class="card">
+                    <h2>AI-Powered Analysis</h2>
+                    <div class="log-block" style="background: #f8f9fa; color: #333; border: 1px solid #ddd;">
+                        {ai_summary.replace('\\n', '<br>')}
+                    </div>
+                </div>
+            </div>
+        """
+
+    # NMAP SECTION
+    if 'nmap' in data and data.get('nmap'):
+        html += '<div id="nmap" class="section"><div class="card"><h2>Nmap Port Scan</h2>'
+        for host in data['nmap']:
+            html += f"<h3>Host: {host['ip']}</h3><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>Version</th></tr></thead><tbody>"
+            for port in host['ports']:
+                if port['state'] == 'open':
+                    service = port.get('service', {})
+                    html += f"<tr><td><span class='badge badge-port'>{port['portid']}</span></td><td>{port['protocol']}</td><td>{service.get('name', 'N/A')}</td><td>{service.get('product', 'N/A')}</td><td>{service.get('version', 'N/A')}</td></tr>"
+            html += "</tbody></table>"
+        html += '</div></div>'
+
+    # DIRFUZZ SECTION
+    if 'dirfuzz' in data and data.get('dirfuzz'):
+        html += '<div id="dirfuzz" class="section"><div class="card"><h2>Directory Fuzzing Results</h2>'
+        html += '<div class="log-block">'
+        for d in data['dirfuzz']:
+            html += f"<div>{d}</div>"
+        html += '</div></div></div>'
+
+    # NIKTO SECTION
+    if 'nikto' in data and data.get('nikto'):
+        html += '<div id="nikto" class="section"><div class="card"><h2>Nikto Vulnerability Scan</h2><ul>'
+        for finding in data['nikto']:
+            html += f"<li style='margin-bottom: 10px;'><span class='finding-high'>{finding}</span></li>"
+        html += '</ul></div></div>'
+
+    # SUBENUM SECTION
+    if 'subenum' in data and data.get('subenum'):
+        html += '<div id="subenum" class="section"><div class="card"><h2>Discovered Subdomains (Passive)</h2><ul>'
+        for sub in data['subenum']:
+            html += f"<li><a href='http://{sub}' target='_blank'>{sub}</a></li>"
+        html += '</ul></div></div>'
+
+    # SUBFUZZ SECTION
+    if 'subfuzz' in data and data.get('subfuzz'):
+        html += '<div id="subfuzz" class="section"><div class="card"><h2>Discovered Subdomains (Bruteforce)</h2><ul>'
+        for sub in data['subfuzz']:
+            html += f"<li><a href='http://{sub}' target='_blank'>{sub}</a></li>"
+        html += '</ul></div></div>'
+
+    # WHATWEB SECTION
+    if 'whatweb' in data and data.get('whatweb'):
+        html += '<div id="whatweb" class="section"><div class="card"><h2>Web Technologies</h2>'
+        for tech in data['whatweb']:
+            html += f"<h3>{tech.get('target')}</h3><div style='display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;'>"
+            for plugin, info in tech.get('plugins', {}).items():
+                details = []
+                if 'version' in info and info['version']:
+                    details.append(f"v{', '.join(map(str, info['version']))}")
+                details_str = f" ({' '.join(details)})" if details else ""
+                html += f"<div style='background: #eee; padding: 10px; border-radius: 5px;'><b>{plugin}</b>{details_str}</div>"
+            html += "</div>"
+        html += '</div></div>'
+
+    # URLSCAN SECTION
+    if 'urlscan' in data and data.get('urlscan'):
+        html += '<div id="urlscan" class="section"><div class="card"><h2>URLScan.io Analysis</h2>'
+        if 'technologies' in data['urlscan'] and data['urlscan']['technologies']:
+            html += f"<h3>Technologies</h3><div style='display: flex; flex-wrap: wrap; gap: 10px;'>{''.join(f'<span class=\"badge\" style=\"background: #555;\">{tech}</span>' for tech in data['urlscan']['technologies'])}</div>"
+        if 'ips' in data['urlscan'] and data['urlscan']['ips']:
+            html += f"<h3>IPs</h3><ul>{''.join(f'<li>{ip}</li>' for ip in data['urlscan']['ips'])}</ul>"
+        if 'domains' in data['urlscan'] and data['urlscan']['domains']:
+            html += f"<h3>Related Domains</h3><ul>{''.join(f'<li>{domain}</li>' for domain in data['urlscan']['domains'])}</ul>"
+        html += '</div></div>'
+
+    html += """
+        </div>
+        <script>
+            function showSection(sectionId) {
+                // Hide all sections
+                document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+                // Show target section
+                document.getElementById(sectionId).classList.add('active');
+
+                // Update nav state
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                event.target.classList.add('active');
+            }
+        </script>
     </body>
     </html>
     """
@@ -232,12 +409,10 @@ def save_html_report(data, output_dir, ai_summary=None):
     try:
         with open(output_file, 'w') as f:
             f.write(html)
-        print(f"[+] HTML report saved to: {output_file}")
+        print(f"[+] Interactive HTML report saved to: {output_file}")
     except IOError as e:
         print(f"[!] Error saving HTML report: {e}")
 
-import groq
-from .config import get_api_key
 
 def generate_ai_summary(data):
     """Generates a summary using the Groq API."""

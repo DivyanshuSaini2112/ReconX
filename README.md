@@ -74,8 +74,14 @@
 
 ### 📊 **Advanced Features**
 
+- **Interactive Reports**
+  Modern dashboard-style HTML report with tabs and easy navigation
+
 - **Multi-Format Reports**  
   JSON, plain text, and professional HTML reports
+
+- **Real-time Status**
+  Live progress tracking with elapsed timers for all modules
 
 - **AI-Powered Analysis**  
   Optional local AI summaries via Ollama integration
