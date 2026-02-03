@@ -276,7 +276,7 @@ def _markdown_to_html(text):
     return t
 
 def save_html_report(data, output_dir, ai_summary=None):
-    """Generates and saves a professional, highly animated cybersecurity dashboard report."""
+    """Generates and saves a professional, highly animated cybersecurity dashboard report with new ReconX logo."""
     
     # Calculate statistics
     total_open_ports = 0
@@ -315,6 +315,162 @@ def save_html_report(data, output_dir, ai_summary=None):
         'connections': network_connections
     })
     
+    # NEW RECONX LOGO SVG
+    reconx_logo_svg = '''<svg width="120" height="120" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00F0C3;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#00FFCC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00FF88;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="grad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0.8" />
+    </linearGradient>
+    
+    <filter id="neon">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <radialGradient id="radarGrad">
+      <stop offset="0%" style="stop-color:#00F0C3;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#00F0C3;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <rect width="400" height="400" fill="transparent"/>
+  
+  <g transform="translate(200, 200)">
+    
+    <circle cx="0" cy="0" r="90" 
+            fill="#0F1419" 
+            opacity="0.8"/>
+    
+    <circle cx="0" cy="0" r="85" 
+            fill="none" 
+            stroke="#00F0C3" 
+            stroke-width="1"
+            opacity="0.3"/>
+    <circle cx="0" cy="0" r="65" 
+            fill="none" 
+            stroke="#00F0C3" 
+            stroke-width="1"
+            opacity="0.3"/>
+    <circle cx="0" cy="0" r="45" 
+            fill="none" 
+            stroke="#00F0C3" 
+            stroke-width="1"
+            opacity="0.3"/>
+    <circle cx="0" cy="0" r="25" 
+            fill="none" 
+            stroke="#00F0C3" 
+            stroke-width="1"
+            opacity="0.3"/>
+    
+    <line x1="-85" y1="0" x2="85" y2="0" 
+          stroke="#00F0C3" 
+          stroke-width="1"
+          opacity="0.3"/>
+    <line x1="0" y1="-85" x2="0" y2="85" 
+          stroke="#00F0C3" 
+          stroke-width="1"
+          opacity="0.3"/>
+    
+    <g>
+      <path d="M -40,-30 L -40,30 M -40,-30 L -15,-30 Q -5,-30 -5,-20 Q -5,-10 -15,-10 L -40,-10 M -15,-10 L -5,30" 
+            stroke="url(#grad1)" 
+            stroke-width="5"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            filter="url(#neon)"/>
+    </g>
+    
+    <g transform="translate(20, 0)">
+      <line x1="-25" y1="-30" x2="25" y2="30" 
+            stroke="url(#grad1)" 
+            stroke-width="5"
+            stroke-linecap="round"
+            filter="url(#neon)"/>
+      <line x1="25" y1="-30" x2="-25" y2="30" 
+            stroke="url(#grad1)" 
+            stroke-width="5"
+            stroke-linecap="round"
+            filter="url(#neon)"/>
+    </g>
+    
+    <circle cx="0" cy="0" r="12" 
+            fill="none" 
+            stroke="#FFD700" 
+            stroke-width="2"
+            opacity="0.8"/>
+    <circle cx="0" cy="0" r="4" 
+            fill="#FFD700" 
+            opacity="0.9">
+      <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    
+    <g transform="translate(-65, -65)">
+      <line x1="0" y1="0" x2="15" y2="0" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="0" y2="15" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    
+    <g transform="translate(65, -65)">
+      <line x1="0" y1="0" x2="-15" y2="0" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="0" y2="15" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    
+    <g transform="translate(-65, 65)">
+      <line x1="0" y1="0" x2="15" y2="0" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="0" y2="-15" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    
+    <g transform="translate(65, 65)">
+      <line x1="0" y1="0" x2="-15" y2="0" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="0" y2="-15" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    
+    <path d="M 0,-85 A 85,85 0 0,1 60,-60" 
+          fill="none" 
+          stroke="url(#grad2)" 
+          stroke-width="2"
+          opacity="0.6"
+          filter="url(#neon)">
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        from="0 0 0"
+        to="360 0 0"
+        dur="4s"
+        repeatCount="indefinite"/>
+    </path>
+    
+    <circle cx="0" cy="0" r="95" 
+            fill="none" 
+            stroke="url(#grad1)" 
+            stroke-width="2.5"
+            stroke-dasharray="5 10"
+            opacity="0.6"/>
+    
+    <circle cx="50" cy="-30" r="3" fill="#FFD700">
+      <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="-40" cy="50" r="3" fill="#00FF88">
+      <animate attributeName="opacity" values="1;0;1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="60" cy="40" r="3" fill="#00F0C3">
+      <animate attributeName="opacity" values="0;1;0" dur="1.8s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    
+  </g>
+</svg>'''
+    
     html = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -340,12 +496,14 @@ def save_html_report(data, output_dir, ai_summary=None):
                 --text-muted: #6b7280;
                 --accent-primary: #00ff88;
                 --accent-secondary: #00d4ff;
+                --accent-cyan: #00F0C3;
                 --accent-purple: #a78bfa;
                 --success: #10b981;
                 --warning: #f59e0b;
                 --danger: #ef4444;
                 --border-color: #1f2937;
                 --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+                --glow-cyan: 0 0 20px rgba(0, 240, 195, 0.4);
                 --glow-blue: 0 0 20px rgba(0, 212, 255, 0.3);
                 --glow-red: 0 0 20px rgba(239, 68, 68, 0.3);
             }}
@@ -367,8 +525,8 @@ def save_html_report(data, output_dir, ai_summary=None):
                 width: 100%;
                 height: 100%;
                 background-image: 
-                    linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+                    linear-gradient(rgba(0, 240, 195, 0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0, 240, 195, 0.03) 1px, transparent 1px);
                 background-size: 50px 50px;
                 animation: gridMove 20s linear infinite;
                 z-index: 0;
@@ -380,7 +538,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 100% {{ background-position: 50px 50px; }}
             }}
             
-            /* Particle System */
+            /* Particles Container */
             .particles-container {{
                 position: fixed;
                 top: 0;
@@ -396,7 +554,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 position: absolute;
                 width: 2px;
                 height: 2px;
-                background: var(--accent-primary);
+                background: var(--accent-cyan);
                 border-radius: 50%;
                 opacity: 0;
                 animation: particleFloat 15s linear infinite;
@@ -424,7 +582,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 height: 100%;
                 z-index: 1;
                 pointer-events: none;
-                opacity: 0.4;
+                opacity: 0.35;
             }}
             
             /* Main Container */
@@ -436,16 +594,19 @@ def save_html_report(data, output_dir, ai_summary=None):
                 padding: 2rem;
             }}
             
-            /* Cyberpunk Header */
+            /* Enhanced Header with Logo */
             .header {{
                 position: relative;
-                background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 212, 255, 0.1));
-                border: 1px solid var(--accent-primary);
+                background: linear-gradient(135deg, rgba(0, 240, 195, 0.08), rgba(0, 212, 255, 0.08));
+                border: 1px solid var(--accent-cyan);
                 border-radius: 16px;
-                padding: 3rem;
+                padding: 2.5rem 3rem;
                 margin-bottom: 2rem;
                 overflow: hidden;
-                box-shadow: var(--glow-green), 0 10px 40px rgba(0, 0, 0, 0.5);
+                box-shadow: var(--glow-cyan), 0 10px 40px rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                gap: 2rem;
             }}
             
             .header::before {{
@@ -455,7 +616,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 right: -50%;
                 width: 200%;
                 height: 200%;
-                background: radial-gradient(circle, rgba(0, 255, 136, 0.1) 0%, transparent 70%);
+                background: radial-gradient(circle, rgba(0, 240, 195, 0.1) 0%, transparent 70%);
                 animation: headerPulse 8s ease-in-out infinite;
             }}
             
@@ -464,21 +625,29 @@ def save_html_report(data, output_dir, ai_summary=None):
                 50% {{ transform: scale(1.1) rotate(180deg); opacity: 0.8; }}
             }}
             
+            .header-logo {{
+                position: relative;
+                z-index: 3;
+                flex-shrink: 0;
+                filter: drop-shadow(0 0 15px rgba(0, 240, 195, 0.5));
+            }}
+            
             .header-content {{
                 position: relative;
                 z-index: 2;
+                flex-grow: 1;
             }}
             
             .header h1 {{
                 font-size: 3rem;
                 font-weight: 800;
-                background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+                background: linear-gradient(90deg, var(--accent-cyan), var(--accent-secondary));
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
                 margin-bottom: 0.5rem;
                 letter-spacing: -1px;
-                text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+                text-shadow: 0 0 30px rgba(0, 240, 195, 0.5);
                 animation: textGlow 3s ease-in-out infinite;
             }}
             
@@ -495,17 +664,16 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .header-actions {{
-                position: absolute;
-                top: 2rem;
-                right: 2rem;
+                position: relative;
+                z-index: 3;
                 display: flex;
                 gap: 1rem;
-                z-index: 3;
+                flex-shrink: 0;
             }}
             
             .btn {{
                 padding: 0.75rem 1.5rem;
-                border: 1px solid var(--accent-primary);
+                border: 1px solid var(--accent-cyan);
                 border-radius: 8px;
                 font-weight: 500;
                 cursor: pointer;
@@ -514,8 +682,8 @@ def save_html_report(data, output_dir, ai_summary=None):
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
-                background: rgba(0, 255, 136, 0.05);
-                color: var(--accent-primary);
+                background: rgba(0, 240, 195, 0.05);
+                color: var(--accent-cyan);
                 font-family: 'JetBrains Mono', monospace;
                 position: relative;
                 overflow: hidden;
@@ -529,7 +697,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 width: 0;
                 height: 0;
                 border-radius: 50%;
-                background: rgba(0, 255, 136, 0.2);
+                background: rgba(0, 240, 195, 0.2);
                 transform: translate(-50%, -50%);
                 transition: width 0.5s, height 0.5s;
             }}
@@ -540,8 +708,8 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .btn:hover {{
-                background: rgba(0, 255, 136, 0.1);
-                box-shadow: var(--glow-green);
+                background: rgba(0, 240, 195, 0.1);
+                box-shadow: var(--glow-cyan);
                 transform: translateY(-2px);
             }}
             
@@ -575,7 +743,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 left: -100%;
                 width: 100%;
                 height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+                background: linear-gradient(90deg, transparent, rgba(0, 240, 195, 0.1), transparent);
                 transition: left 0.5s;
             }}
             
@@ -585,8 +753,8 @@ def save_html_report(data, output_dir, ai_summary=None):
             
             .stat-card:hover {{
                 transform: translateY(-4px);
-                border-color: var(--accent-primary);
-                box-shadow: var(--glow-green);
+                border-color: var(--accent-cyan);
+                box-shadow: var(--glow-cyan);
             }}
             
             .stat-header {{
@@ -613,23 +781,23 @@ def save_html_report(data, output_dir, ai_summary=None):
                 align-items: center;
                 justify-content: center;
                 font-size: 1.3rem;
-                background: rgba(0, 255, 136, 0.1);
-                border: 1px solid var(--accent-primary);
+                background: rgba(0, 240, 195, 0.1);
+                border: 1px solid var(--accent-cyan);
                 animation: iconPulse 2s ease-in-out infinite;
             }}
             
             @keyframes iconPulse {{
-                0%, 100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }}
-                50% {{ transform: scale(1.05); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }}
+                0%, 100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 240, 195, 0.4); }}
+                50% {{ transform: scale(1.05); box-shadow: 0 0 0 10px rgba(0, 240, 195, 0); }}
             }}
             
             .stat-value {{
                 font-size: 2.5rem;
                 font-weight: 700;
-                color: var(--accent-primary);
+                color: var(--accent-cyan);
                 font-family: 'JetBrains Mono', monospace;
                 line-height: 1;
-                text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+                text-shadow: 0 0 20px rgba(0, 240, 195, 0.5);
             }}
             
             .stat-change {{
@@ -694,7 +862,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 right: 0;
                 width: 2px;
                 height: 100%;
-                background: linear-gradient(180deg, transparent, var(--accent-primary), transparent);
+                background: linear-gradient(180deg, transparent, var(--accent-cyan), transparent);
                 animation: scanLine 3s linear infinite;
             }}
             
@@ -704,8 +872,8 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .module-section:hover {{
-                border-color: var(--accent-primary);
-                box-shadow: var(--glow-green);
+                border-color: var(--accent-cyan);
+                box-shadow: var(--glow-cyan);
             }}
             
             .module-header {{
@@ -730,18 +898,18 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .module-badge {{
-                background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+                background: linear-gradient(135deg, var(--accent-cyan), var(--accent-secondary));
                 color: var(--bg-primary);
                 padding: 0.25rem 0.75rem;
                 border-radius: 12px;
                 font-size: 0.75rem;
                 font-weight: 700;
-                box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+                box-shadow: 0 0 15px rgba(0, 240, 195, 0.5);
             }}
             
             .collapse-icon {{
                 transition: transform 0.3s ease;
-                color: var(--accent-primary);
+                color: var(--accent-cyan);
                 font-size: 1.5rem;
             }}
             
@@ -769,18 +937,18 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .data-table thead {{
-                background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 212, 255, 0.1));
+                background: linear-gradient(135deg, rgba(0, 240, 195, 0.1), rgba(0, 212, 255, 0.1));
             }}
             
             .data-table th {{
                 padding: 1rem;
                 text-align: left;
                 font-weight: 700;
-                color: var(--accent-primary);
+                color: var(--accent-cyan);
                 font-size: 0.75rem;
                 text-transform: uppercase;
                 letter-spacing: 1px;
-                border-bottom: 2px solid var(--accent-primary);
+                border-bottom: 2px solid var(--accent-cyan);
                 font-family: 'JetBrains Mono', monospace;
             }}
             
@@ -804,7 +972,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 top: 0;
                 width: 0;
                 height: 100%;
-                background: linear-gradient(90deg, var(--accent-primary), transparent);
+                background: linear-gradient(90deg, var(--accent-cyan), transparent);
                 transition: width 0.3s ease;
                 opacity: 0.1;
             }}
@@ -814,14 +982,14 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .data-table tbody tr:hover {{
-                background: rgba(0, 255, 136, 0.02);
+                background: rgba(0, 240, 195, 0.02);
             }}
             
             /* Code Blocks */
             .code-block {{
                 background: var(--bg-primary);
                 border: 1px solid var(--border-color);
-                border-left: 3px solid var(--accent-primary);
+                border-left: 3px solid var(--accent-cyan);
                 border-radius: 8px;
                 padding: 1.5rem;
                 overflow-x: auto;
@@ -867,7 +1035,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 top: 50%;
                 width: 0;
                 height: 2px;
-                background: var(--accent-primary);
+                background: var(--accent-cyan);
                 transition: width 0.3s ease;
                 transform: translateY(-50%);
             }}
@@ -877,7 +1045,7 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .list-item:hover {{
-                background: rgba(0, 255, 136, 0.02);
+                background: rgba(0, 240, 195, 0.02);
                 padding-left: 1.5rem;
             }}
             
@@ -885,9 +1053,9 @@ def save_html_report(data, output_dir, ai_summary=None):
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
-                background: var(--accent-primary);
+                background: var(--accent-cyan);
                 flex-shrink: 0;
-                box-shadow: 0 0 10px rgba(0, 255, 136, 0.8);
+                box-shadow: 0 0 10px rgba(0, 240, 195, 0.8);
                 animation: bulletPulse 2s ease-in-out infinite;
             }}
             
@@ -948,9 +1116,9 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .port-normal {{
-                background: rgba(0, 212, 255, 0.1);
-                color: var(--accent-secondary);
-                border-color: var(--accent-secondary);
+                background: rgba(0, 240, 195, 0.1);
+                color: var(--accent-cyan);
+                border-color: var(--accent-cyan);
             }}
             
             /* Alert Boxes */
@@ -1009,13 +1177,13 @@ def save_html_report(data, output_dir, ai_summary=None):
                 left: 1rem;
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 0.75rem;
-                color: var(--accent-primary);
+                color: var(--accent-cyan);
                 background: rgba(0, 0, 0, 0.5);
                 padding: 0.5rem 1rem;
                 border-radius: 6px;
-                border: 1px solid var(--accent-primary);
+                border: 1px solid var(--accent-cyan);
                 z-index: 1000;
-                box-shadow: var(--glow-green);
+                box-shadow: var(--glow-cyan);
             }}
             
             /* Loading Bar Animation */
@@ -1025,11 +1193,11 @@ def save_html_report(data, output_dir, ai_summary=None):
                 left: 0;
                 width: 100%;
                 height: 3px;
-                background: var(--accent-primary);
+                background: var(--accent-cyan);
                 transform-origin: left;
                 animation: loadingProgress 2s ease-in-out infinite;
                 z-index: 9999;
-                box-shadow: 0 0 10px var(--accent-primary);
+                box-shadow: 0 0 10px var(--accent-cyan);
             }}
             
             @keyframes loadingProgress {{
@@ -1052,12 +1220,18 @@ def save_html_report(data, output_dir, ai_summary=None):
             /* Responsive */
             @media (max-width: 768px) {{
                 .dashboard {{ padding: 1rem; }}
-                .header {{ padding: 1.5rem; }}
+                .header {{ 
+                    padding: 1.5rem; 
+                    flex-direction: column;
+                }}
                 .header h1 {{ font-size: 2rem; }}
                 .header-actions {{
-                    position: static;
                     margin-top: 1rem;
                     flex-direction: column;
+                    width: 100%;
+                }}
+                .header-logo {{
+                    margin: 0 auto;
                 }}
                 .stats-grid {{ grid-template-columns: 1fr; }}
             }}
@@ -1066,9 +1240,9 @@ def save_html_report(data, output_dir, ai_summary=None):
             ::-webkit-scrollbar {{ width: 10px; height: 10px; }}
             ::-webkit-scrollbar-track {{ background: var(--bg-primary); }}
             ::-webkit-scrollbar-thumb {{ 
-                background: var(--accent-primary); 
+                background: var(--accent-cyan); 
                 border-radius: 5px;
-                box-shadow: 0 0 10px var(--accent-primary);
+                box-shadow: 0 0 10px var(--accent-cyan);
             }}
             ::-webkit-scrollbar-thumb:hover {{ 
                 background: var(--accent-secondary); 
@@ -1094,8 +1268,18 @@ def save_html_report(data, output_dir, ai_summary=None):
         <canvas id="network-canvas"></canvas>
         
         <div class="dashboard">
-            <!-- Header -->
+            <!-- Header with Logo -->
             <div class="header">
+                <div class="header-logo">
+                    {reconx_logo_svg}
+                </div>
+                <div class="header-content">
+                    <h1>RECONX SECURITY PLATFORM</h1>
+                    <p class="subtitle">&gt; COMPREHENSIVE RECONNAISSANCE & VULNERABILITY ANALYSIS SYSTEM</p>
+                    <div class="risk-badge risk-{risk_level.lower()}">
+                        {'🔴' if risk_level == 'High' else ('🟡' if risk_level == 'Medium' else '🟢')} THREAT LEVEL: {risk_level.upper()}
+                    </div>
+                </div>
                 <div class="header-actions">
                     <button class="btn" onclick="window.print()">
                         <span>📄</span>
@@ -1105,13 +1289,6 @@ def save_html_report(data, output_dir, ai_summary=None):
                         <span>⛶</span>
                         <span>FULLSCREEN</span>
                     </button>
-                </div>
-                <div class="header-content">
-                    <h1>⚡ RECONX SECURITY PLATFORM</h1>
-                    <p class="subtitle">&gt; COMPREHENSIVE RECONNAISSANCE & VULNERABILITY ANALYSIS SYSTEM</p>
-                    <div class="risk-badge risk-{risk_level.lower()}">
-                        {'🔴' if risk_level == 'High' else ('🟡' if risk_level == 'Medium' else '🟢')} THREAT LEVEL: {risk_level.upper()}
-                    </div>
                 </div>
             </div>
             
@@ -1198,7 +1375,7 @@ def save_html_report(data, output_dir, ai_summary=None):
             open_ports = [p for p in host['ports'] if p['state'] == 'open']
             if open_ports:
                 html += f"""
-                    <h3 style="color: var(--accent-primary); margin: 1.5rem 0 1rem 0; display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace;">
+                    <h3 style="color: var(--accent-cyan); margin: 1.5rem 0 1rem 0; display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace;">
                         🖥️ HOST: <span style="color: var(--accent-secondary);">{_escape_html(host['ip'])}</span>
                     </h3>
                     <table class="data-table">
@@ -1579,12 +1756,12 @@ def save_html_report(data, output_dir, ai_summary=None):
                     ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
                     ctx.fillStyle = this.data.critical ? 
                         `rgba(239, 68, 68, ${{opacity}})` : 
-                        `rgba(0, 255, 136, ${{opacity}})`;
+                        `rgba(0, 240, 195, ${{opacity}})`;
                     ctx.fill();
                     
                     // Glow effect
                     ctx.shadowBlur = 15;
-                    ctx.shadowColor = this.data.critical ? '#ef4444' : '#00ff88';
+                    ctx.shadowColor = this.data.critical ? '#ef4444' : '#00F0C3';
                     ctx.fill();
                     ctx.shadowBlur = 0;
                 }}
@@ -1615,7 +1792,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                             ctx.beginPath();
                             ctx.moveTo(nodes[i].x, nodes[i].y);
                             ctx.lineTo(nodes[j].x, nodes[j].y);
-                            ctx.strokeStyle = `rgba(0, 255, 136, ${{opacity}})`;
+                            ctx.strokeStyle = `rgba(0, 240, 195, ${{opacity}})`;
                             ctx.lineWidth = 0.5;
                             ctx.stroke();
                         }}
