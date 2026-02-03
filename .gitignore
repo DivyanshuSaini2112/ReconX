@@ -12,3 +12,12 @@ tests/tmp/
 
 # Config file
 reconx/config.ini
+
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# Recon output
+results/

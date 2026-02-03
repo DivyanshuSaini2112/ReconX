@@ -1,126 +1,152 @@
+import os
+import shlex
 import subprocess
 import xml.etree.ElementTree as ET
-import os
+from typing import Dict, List, Optional, Union
+
 
 class NmapScanner:
-    def __init__(self, target, profile, output_dir, nmap_args=''):
+    def __init__(self, target: str, profile: str, output_dir: str, nmap_args: str = ''):
         self.target = target
         self.profile = profile
         self.output_dir = output_dir
-        self.nmap_args = nmap_args
-        self.quick_scan_file = os.path.join(self.output_dir, 'nmap_quick_scan.xml')
-        self.output_file = os.path.join(self.output_dir, 'nmap_detailed_scan.xml')
+        self.nmap_args = nmap_args or ''
+        self.log_file = os.path.join(self.output_dir, 'nmap.log')
 
-    def get_command(self):
+    def get_command(self) -> List[str]:
         """Returns a descriptive list of commands for no-exec mode."""
+        quick = "nmap -T4 -F -oX - {target}".format(target=self.target)
+        detailed = "nmap -p <open_ports> {profile} {extra} -oX - {target}".format(
+            profile=" ".join(self._profile_args()),
+            extra=self.nmap_args,
+            target=self.target
+        ).strip()
         return [
-            f"Stage 1 (Port Discovery): nmap -T4 -F -oX {self.quick_scan_file} {self.target}",
-            f"Stage 2 (Detailed Scan): nmap -p <open_ports> [profile_args] -oX {self.output_file} {self.target}"
+            f"Stage 1 (Port Discovery): {quick}",
+            f"Stage 2 (Detailed Scan): {detailed}"
         ]
 
-    def _run_quick_scan(self, timeout):
-        """Runs a fast scan to discover open ports."""
-        command = ['nmap', '-T4', '-F', '-oX', self.quick_scan_file, self.target]
+    def run_scan(self, timeout: Optional[int] = None) -> Union[List[Dict], dict]:
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True, timeout=timeout)
-            return self._parse_open_ports()
-        except FileNotFoundError:
-            raise
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-            # Pass the original exception up
-            raise e
-
-    def _parse_open_ports(self):
-        """Parses the quick scan XML to find open ports."""
-        try:
-            tree = ET.parse(self.quick_scan_file)
-            root = tree.getroot()
-            open_ports = []
-            for port in root.findall(".//port"):
-                if port.find(".//state[@state='open']") is not None:
-                    open_ports.append(port.get('portid'))
-            return open_ports
-        except (ET.ParseError, FileNotFoundError):
-            return []
-
-    def run_scan(self, timeout=None):
-        try:
-            # Stage 1: Quick Scan
-            open_ports = self._run_quick_scan(timeout)
+            quick_cmd = ['nmap', '-T4', '-F', '-oX', '-', self.target]
+            quick_result = self._run_command(quick_cmd, timeout, stage='quick')
+            open_ports = self._parse_open_ports(quick_result.stdout)
 
             if not open_ports:
                 return {'message': 'No open ports found in the initial scan.'}
 
-            ports_str = ",".join(open_ports)
-
-            # Stage 2: Detailed Scan
-            profile_args = {
-                'fast': ['-T4', '-sV', '--version-light'],
-                'default': ['-T4', '-sV', '-sC'],
-                'deep': ['-T4', '-sV', '-sC', '-A']
-            }
-
-            base_cmd = ['nmap', '-p', ports_str, '-oX', self.output_file]
-            detailed_cmd = base_cmd + profile_args.get(self.profile, [])
+            detailed_cmd = ['nmap', '-p', ','.join(open_ports), '-oX', '-']
+            detailed_cmd += self._profile_args()
             if self.nmap_args:
-                detailed_cmd.extend(self.nmap_args.split())
+                detailed_cmd += shlex.split(self.nmap_args)
             detailed_cmd.append(self.target)
 
-            subprocess.run(detailed_cmd, check=True, capture_output=True, text=True, timeout=timeout)
-
-            return self.parse_results()
-
+            detailed_result = self._run_command(detailed_cmd, timeout, stage='detailed')
+            return self.parse_results(detailed_result.stdout)
         except FileNotFoundError:
             return {'error': "'nmap' command not found. Make sure it's installed and in your PATH."}
         except subprocess.TimeoutExpired:
             return {'error': f"Nmap scan timed out after {timeout} seconds."}
-        except subprocess.CalledProcessError as e:
-            return {'error': f"Error running Nmap: {e.stderr}"}
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or '').strip()
+            return {'error': f"Error running Nmap: {stderr or 'unknown error'}"}
 
-    def parse_results(self):
+    def parse_results(self, xml_output: Optional[str]) -> List[Dict]:
+        if not xml_output:
+            return []
+
         try:
-            tree = ET.parse(self.output_file)
-            root = tree.getroot()
+            root = ET.fromstring(xml_output)
+        except ET.ParseError:
+            return []
 
-            hosts = []
-            for host in root.findall('host'):
-                host_info = {
-                    'ip': host.find('address').get('addr'),
-                    'ports': []
+        hosts: List[Dict] = []
+        for host in root.findall('host'):
+            address = host.find('address')
+            ip = address.get('addr') if address is not None else 'unknown'
+            host_info = {'ip': ip, 'ports': []}
+
+            ports = host.find('ports')
+            if ports is None:
+                hosts.append(host_info)
+                continue
+
+            for port in ports.findall('port'):
+                state_node = port.find('state')
+                service_node = port.find('service')
+
+                port_info = {
+                    'portid': port.get('portid'),
+                    'protocol': port.get('protocol'),
+                    'state': state_node.get('state') if state_node is not None else 'unknown',
+                    'service': {},
+                    'scripts': []
                 }
 
-                ports = host.find('ports')
-                if ports:
-                    for port in ports.findall('port'):
-                        port_info = {
-                            'portid': port.get('portid'),
-                            'protocol': port.get('protocol'),
-                            'state': port.find('state').get('state'),
-                            'service': {},
-                            'scripts': []
-                        }
+                if service_node is not None:
+                    port_info['service'] = {
+                        'name': service_node.get('name'),
+                        'product': service_node.get('product'),
+                        'version': service_node.get('version')
+                    }
 
-                        service = port.find('service')
-                        if service is not None:
-                            port_info['service'] = {
-                                'name': service.get('name'),
-                                'product': service.get('product'),
-                                'version': service.get('version')
-                            }
+                for script in port.findall('script'):
+                    port_info['scripts'].append({
+                        'id': script.get('id'),
+                        'output': script.get('output')
+                    })
 
-                        for script in port.findall('script'):
-                            port_info['scripts'].append({
-                                'id': script.get('id'),
-                                'output': script.get('output')
-                            })
+                host_info['ports'].append(port_info)
 
-                        host_info['ports'].append(port_info)
-                hosts.append(host_info)
+            hosts.append(host_info)
 
-            return hosts
-        except ET.ParseError as e:
-            print(f"[!] Error parsing Nmap XML output: {e}")
-            return None
-        except FileNotFoundError:
-            print(f"[!] Nmap output file not found: {self.output_file}")
-            return None
+        return hosts
+
+    def _parse_open_ports(self, xml_output: Optional[str]) -> List[str]:
+        if not xml_output:
+            return []
+
+        try:
+            root = ET.fromstring(xml_output)
+        except ET.ParseError:
+            return []
+
+        open_ports: List[str] = []
+        for port in root.findall(".//port"):
+            state = port.find("state")
+            if state is not None and state.get('state') == 'open':
+                open_ports.append(port.get('portid'))
+        return open_ports
+
+    def _run_command(self, command: List[str], timeout: Optional[int], stage: str) -> subprocess.CompletedProcess:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True
+        )
+        self._write_log(command, result.stdout, result.stderr, stage=stage)
+        return result
+
+    def _profile_args(self) -> List[str]:
+        profiles = {
+            'fast': ['-T4', '-sV', '--version-light'],
+            'default': ['-T4', '-sV', '-sC'],
+            'deep': ['-T4', '-sV', '-sC', '-A']
+        }
+        return profiles.get(self.profile, profiles['default']).copy()
+
+    def _write_log(self, command: List[str], stdout: str, stderr: str, stage: str) -> None:
+        os.makedirs(self.output_dir, exist_ok=True)
+        mode = 'w' if stage == 'quick' else 'a'
+        with open(self.log_file, mode) as log:
+            log.write(f"# Stage: {stage}\n")
+            log.write(f"$ {' '.join(command)}\n")
+            if stdout:
+                log.write("\n--- STDOUT ---\n")
+                log.write(stdout)
+            if stderr:
+                log.write("\n--- STDERR ---\n")
+                log.write(stderr)
+            log.write("\n")

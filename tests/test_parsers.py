@@ -17,8 +17,9 @@ class TestParsers(unittest.TestCase):
 
     def test_nmap_parser(self):
         scanner = nmap.NmapScanner('localhost', 'default', self.output_dir)
-        scanner.output_file = self.sample_nmap_file
-        parsed_data = scanner.parse_results()
+        with open(self.sample_nmap_file, 'r') as fh:
+            xml_data = fh.read()
+        parsed_data = scanner.parse_results(xml_data)
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 1)
         host = parsed_data[0]
@@ -29,24 +30,25 @@ class TestParsers(unittest.TestCase):
 
     def test_subdomain_parser(self):
         scanner = subenum.SubdomainScanner('example.com', self.output_dir)
-        scanner.output_file = self.sample_subdomains_file
-        parsed_data = scanner.parse_results()
+        with open(self.sample_subdomains_file, 'r') as fh:
+            output = fh.read()
+        parsed_data = scanner.parse_results(output)
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 3)
         self.assertIn('test.example.com', parsed_data)
 
     def test_dirfuzz_parser(self):
         scanner = dirfuzz.DirectoryFuzzer('http://example.com', None, 10, self.output_dir)
-        scanner.output_file = self.sample_dirfuzz_file
-        parsed_data = scanner.parse_results()
+        with open(self.sample_dirfuzz_file, 'r') as fh:
+            output = fh.read()
+        parsed_data = scanner.parse_results(output)
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 3)
         self.assertIn('/admin', parsed_data)
 
     def test_whatweb_parser(self):
         scanner = whatweb.WhatWebScanner('http://example.com', self.output_dir)
-        scanner.output_file = self.sample_whatweb_file
-        parsed_data = scanner.parse_results()
+        parsed_data = scanner.parse_results(self.sample_whatweb_file)
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 1)
         self.assertEqual(parsed_data[0]['target'], 'http://example.com')
@@ -54,16 +56,16 @@ class TestParsers(unittest.TestCase):
 
     def test_nikto_parser(self):
         scanner = nikto.NiktoScanner('http://example.com', self.output_dir)
-        scanner.output_file = self.sample_nikto_file
-        parsed_data = scanner.parse_results()
+        with open(self.sample_nikto_file, 'r') as fh:
+            output = fh.read()
+        parsed_data = scanner.parse_results(output)
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 3)
         self.assertTrue(any('X-Frame-Options' in s for s in parsed_data))
 
     def test_ffuf_parser(self):
         scanner = ffuf.FfufFuzzer('http://example.com', None, 10, self.output_dir)
-        scanner.output_file = self.sample_ffuf_file
-        parsed_data = scanner.parse_results()
+        parsed_data = scanner.parse_results(self.sample_ffuf_file)
         self.assertIsNotNone(parsed_data)
         self.assertEqual(len(parsed_data), 2)
         self.assertIn('admin', parsed_data)
