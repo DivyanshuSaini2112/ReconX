@@ -125,27 +125,39 @@
 
 ```
 recony/
-├── 📄 README.md
-├── ⚙️ config.ini.example          # API keys configuration
-├── 📦 setup.py
-├── 📋 requirements.txt
 ├── 📂 reconx/
-│   ├── __init__.py
-│   ├── __main__.py                # CLI entrypoint
 │   ├── 📂 lib/
+│   │   ├── __init__.py
 │   │   ├── config.py              # Configuration handler
 │   │   └── output.py              # Report generation engine
-│   └── 📂 modules/                # Scanner modules
-│       ├── nmap.py                # Port & service scanning
-│       ├── subenum.py             # Subdomain enumeration
-│       ├── dirfuzz.py             # Directory fuzzing
-│       ├── ffuf.py                # Web fuzzing
-│       ├── whatweb.py             # Technology detection
-│       ├── nikto.py               # Vulnerability scanning
-│       ├── sqlmap.py              # SQL injection testing
-│       └── urlscan.py             # URL analysis
-├── 📂 results/                    # Scan outputs
-└── 📂 tests/                      # Unit tests
+│   ├── 📂 modules/                # Scanner modules
+│   │   ├── __init__.py
+│   │   ├── dirfuzz.py             # Directory fuzzing
+│   │   ├── ffuf.py                # Web fuzzing
+│   │   ├── nikto.py               # Vulnerability scanning
+│   │   ├── nmap.py                # Port & service scanning
+│   │   ├── sqlmap.py              # SQL injection testing
+│   │   ├── subenum.py             # Subdomain enumeration
+│   │   ├── subfuzz.py             # Subdomain fuzzing
+│   │   ├── urlscan.py             # URL analysis
+│   │   └── whatweb.py             # Technology detection
+│   └── __main__.py                # CLI entrypoint
+├── 📂 tests/                      # Unit tests
+│   ├── __init__.py
+│   ├── sample_dirfuzz.txt         # Sample directory fuzzing results
+│   ├── sample_ffuf.json           # Sample ffuf output
+│   ├── sample_nikto.txt           # Sample Nikto results
+│   ├── sample_nmap.xml            # Sample Nmap scan
+│   ├── sample_subdomains.txt      # Sample subdomain list
+│   ├── sample_whatweb.json        # Sample WhatWeb output
+│   └── test_parsers.py            # Parser unit tests
+├── 📄 .gitignore
+├── 📄 LICENSE
+├── 📄 README.md
+├── 📄 config.ini.example          # API keys configuration
+├── 📄 reconx-github-banner.svg    # Repository banner
+├── 📄 requirements.txt
+└── 📄 setup.py
 ```
 
 ---
