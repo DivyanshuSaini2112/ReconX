@@ -3,7 +3,7 @@ import sys
 import os
 import datetime
 import concurrent.futures
-from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, sqlmap, ffuf, subfuzz, urlscan, lab
+from reconx.modules import nmap, subenum, whatweb, sqlmap, ffuf, urlscan, lab, httpx, nuclei
 from reconx.lib import output
 from rich.console import Console
 from rich.panel import Panel
@@ -39,6 +39,21 @@ def _get_lab_wordlist(profile):
     path = LAB_WORDLISTS.get(profile, DEFAULT_LAB_WORDLIST)
     return path if os.path.exists(path) else DEFAULT_LAB_WORDLIST
 
+def _get_command_for_no_exec(module_name, scanner, output_dir):
+    """Return command list for no_exec; pass output path where required."""
+    path_arg = os.path.join(output_dir, f'{module_name}.out')
+    temp_dir = os.path.join(output_dir, 'sqlmap_temp')
+    if module_name == 'nuclei':
+        targets_path = os.path.join(output_dir, 'nuclei_targets.txt')
+        return scanner.get_command(targets_path, path_arg)
+    if module_name in ('httpx', 'dirfuzz'):
+        return scanner.get_command(path_arg)
+    if module_name == 'whatweb':
+        return scanner.get_command(path_arg)
+    if module_name == 'sqlmap':
+        return scanner.get_command(temp_dir)
+    return scanner.get_command()
+
 def run_module(module_name, args, output_dir, timeout):
     """Helper function to run a single scanner module with a timeout."""
     scanner = None
@@ -48,18 +63,15 @@ def run_module(module_name, args, output_dir, timeout):
         scanner = subenum.SubdomainScanner(args.target, output_dir)
     elif module_name == 'dirfuzz':
         wordlist = args.wordlist or _get_dir_wordlist(args.profile)
-        if args.fuzzer == 'ffuf':
-            scanner = ffuf.FfufFuzzer(args.target, wordlist, args.threads, output_dir, args.ffuf_args)
-        else:
-            scanner = dirfuzz.DirectoryFuzzer(args.target, wordlist, args.threads, output_dir, args.gobuster_args)
+        scanner = ffuf.FfufFuzzer(args.target, wordlist, args.threads, output_dir, args.ffuf_args)
+    elif module_name == 'httpx':
+        scanner = httpx.HttpxScanner(args.target, output_dir, args.httpx_args)
     elif module_name == 'whatweb':
         scanner = whatweb.WhatWebScanner(args.target, output_dir)
-    elif module_name == 'nikto':
-        scanner = nikto.NiktoScanner(args.target, output_dir)
+    elif module_name == 'nuclei':
+        scanner = nuclei.NucleiScanner(args.target, output_dir, args.nuclei_args)
     elif module_name == 'sqlmap':
         scanner = sqlmap.SqlmapScanner(args.target, output_dir)
-    elif module_name == 'subfuzz':
-        scanner = subfuzz.SubdomainFuzzer(args.target, args.wordlist, args.threads, output_dir, args.ffuf_args)
     elif module_name == 'urlscan':
         scanner = urlscan.UrlScanScanner(args.target, output_dir)
     elif module_name == 'lab':
@@ -68,7 +80,8 @@ def run_module(module_name, args, output_dir, timeout):
 
     if scanner:
         if args.no_exec:
-            console.print(f"  [bold cyan]{module_name.upper()} CMD[/bold cyan]: {' '.join(scanner.get_command())}")
+            cmd = _get_command_for_no_exec(module_name, scanner, output_dir)
+            console.print(f"  [bold cyan]{module_name.upper()} CMD[/bold cyan]: {' '.join(cmd)}")
             return module_name, None
         else:
             # Pass timeout to the run_scan method
@@ -79,23 +92,24 @@ def run_module(module_name, args, output_dir, timeout):
 def main():
     parser = argparse.ArgumentParser(
         description='A CLI-first reconnaissance tool for Kali Linux.',
-        epilog='Example: reconx -t example.com --profile default --modules nmap,subenum,dirfuzz,subfuzz --fuzzer ffuf --html --ai-summary'
+        epilog='Example: reconx -t example.com --profile default --modules nmap,subenum,httpx,whatweb,dirfuzz,urlscan,nuclei --html. Use --lab for internal/HTB targets (replaces subenum with Gobuster DNS).'
     )
 
     # ... (parser arguments are unchanged) ...
     parser.add_argument('-t', '--target', required=True, help='The target IP, domain, or CIDR.')
-    parser.add_argument('--modules', default='nmap,subenum,dirfuzz,whatweb,nikto,urlscan', help='Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz,subfuzz,urlscan).')
+    parser.add_argument('--modules', default='nmap,subenum,httpx,whatweb,dirfuzz,urlscan,nuclei', help='Comma-separated list of modules (nmap,subenum,httpx,whatweb,dirfuzz,urlscan,nuclei).')
     parser.add_argument('--profile', choices=['fast', 'default', 'deep'], default='default', help='Scan profile. Note: fast profile may cause timeouts on some modules.')
     parser.add_argument('--threads', type=int, default=10, help='Number of concurrent threads for fuzzing/discovery.')
-    parser.add_argument('--wordlist', help='Path to a custom wordlist for directory fuzzing.')
-    parser.add_argument('--fuzzer', choices=['gobuster', 'ffuf'], default='gobuster', help='Choose the directory fuzzer to use.')
+    parser.add_argument('--wordlist', help='Path to a custom wordlist for directory/subdomain fuzzing.')
     parser.add_argument('--out', default='./results', help='Directory to save results to.')
     parser.add_argument('--html', action='store_true', help='Generate an HTML report.')
-    parser.add_argument('--lab', action='store_true', help='Use lab-friendly subdomain enumeration (Gobuster DNS).')
+    parser.add_argument('--lab', action='store_true', help='Use lab subdomain enum (Gobuster DNS) instead of subenum for internal targets.')
     parser.add_argument('--ai-summary', action='store_true', help='Generate a summary using an AI model.')
     parser.add_argument('--nmap-args', help='Custom arguments for Nmap.', default='')
-    parser.add_argument('--gobuster-args', help='Custom arguments for Gobuster.', default='')
-    parser.add_argument('--ffuf-args', help='Custom arguments for ffuf.', default='')
+    parser.add_argument('--gobuster-args', help='Custom arguments for Gobuster (lab mode).', default='')
+    parser.add_argument('--ffuf-args', help='Custom arguments for ffuf (dirfuzz).', default='')
+    parser.add_argument('--httpx-args', help='Custom arguments for httpx.', default='')
+    parser.add_argument('--nuclei-args', help='Custom arguments for nuclei.', default='')
     parser.add_argument('--sqlmap', action='store_true', help='Explicitly enable the SQLMap module.')
     parser.add_argument('--no-exec', action='store_true', help='Print planned commands without executing them.')
 

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from rich.table import Table
 from rich.console import Group
 from rich.text import Text
@@ -77,13 +78,6 @@ def generate_summary(data):
             table.add_row(sub)
         renderables.append(table)
 
-    if data.get('subfuzz'):
-        table = Table(title="Discovered Subdomains (Bruteforce)", style="cyan", title_style="bold cyan")
-        table.add_column("Subdomain", style="green")
-        for sub in data['subfuzz']:
-            table.add_row(sub)
-        renderables.append(table)
-
     if data.get('dirfuzz'):
         table = Table(title="Interesting Directories", style="cyan", title_style="bold cyan")
         table.add_column("Path", style="green")
@@ -91,11 +85,36 @@ def generate_summary(data):
             table.add_row(entry)
         renderables.append(table)
 
-    if data.get('nikto'):
-        table = Table(title="Nikto Findings", style="cyan", title_style="bold cyan")
-        table.add_column("Finding", style="green")
-        for finding in data['nikto']:
-            table.add_row(finding)
+    # httpx: list of dicts (url, title, status_code, tech, etc.) or error dict
+    if data.get('httpx') and not _is_error(data['httpx']):
+        table = Table(title="HTTP Probes (httpx)", style="cyan", title_style="bold cyan")
+        table.add_column("URL", style="bold magenta")
+        table.add_column("Status", style="yellow")
+        table.add_column("Title", style="green")
+        table.add_column("Tech", style="cyan")
+        for row in _module_list(data, 'httpx'):
+            if isinstance(row, dict):
+                url = row.get('url') or row.get('input') or row.get('host', '')
+                status = str(row.get('status_code') or row.get('status-code', ''))
+                title = (row.get('title') or '')[:40]
+                t = row.get('tech')
+                tech = ', '.join(t[:5]) if isinstance(t, list) else (str(t)[:40] if t else '')
+                table.add_row(url, status, title, tech)
+        renderables.append(table)
+
+    # nuclei: list of dicts (template-id, info.severity, host, etc.) or error dict
+    if data.get('nuclei') and not _is_error(data['nuclei']):
+        table = Table(title="Nuclei Findings", style="cyan", title_style="bold cyan")
+        table.add_column("Template", style="bold magenta")
+        table.add_column("Severity", style="yellow")
+        table.add_column("Host", style="green")
+        for row in _module_list(data, 'nuclei'):
+            if isinstance(row, dict):
+                info = row.get('info') or {}
+                name = info.get('name') or row.get('template-id') or row.get('templateID') or row.get('template_id') or ''
+                severity = info.get('severity') or row.get('severity') or ''
+                host = row.get('host') or row.get('matched-at') or row.get('matched_at') or row.get('matchedAt') or ''
+                table.add_row(str(name)[:50], str(severity), str(host)[:60])
         renderables.append(table)
 
     if data.get('sqlmap'):
@@ -115,8 +134,8 @@ def generate_summary(data):
     if data.get('dirfuzz'):
         action_list.append("Review newly discovered directories for sensitive content.")
 
-    if data.get('nikto'):
-        action_list.append("Validate Nikto findings and misconfigurations.")
+    if data.get('nuclei') and not _is_error(data.get('nuclei')):
+        action_list.append("Validate Nuclei findings and prioritize by severity.")
 
     # Action List
     if action_list:
@@ -146,7 +165,7 @@ def write_summary_log(data, output_dir):
                 lines.append(f"- {host['ip']}:{port['portid']}/{port['protocol']} {service.get('name', 'unknown')} ({service_info})")
         lines.append("")
 
-    for key, heading in (('subenum', 'Passive Subdomains'), ('lab', 'Lab Subdomains'), ('subfuzz', 'Bruteforced Subdomains')):
+    for key, heading in (('subenum', 'Passive Subdomains'), ('lab', 'Lab Subdomains')):
         if data.get(key):
             lines.append(f"## {heading}")
             for item in data[key]:
@@ -159,10 +178,25 @@ def write_summary_log(data, output_dir):
             lines.append(f"- {entry}")
         lines.append("")
 
-    if data.get('nikto'):
-        lines.append("## Nikto Findings")
-        for finding in data['nikto']:
-            lines.append(f"- {finding}")
+    if data.get('httpx') and not _is_error(data.get('httpx')):
+        lines.append("## HTTP Probes (httpx)")
+        for row in _module_list(data, 'httpx'):
+            if isinstance(row, dict):
+                url = row.get('url') or row.get('input', '')
+                status = row.get('status_code', '')
+                title = row.get('title', '')
+                lines.append(f"- {url} [{status}] {title}")
+        lines.append("")
+
+    if data.get('nuclei') and not _is_error(data.get('nuclei')):
+        lines.append("## Nuclei Findings")
+        for row in _module_list(data, 'nuclei'):
+            if isinstance(row, dict):
+                info = row.get('info') or {}
+                name = info.get('name') or row.get('template-id') or row.get('templateID', '')
+                severity = info.get('severity') or row.get('severity', '')
+                host = row.get('host') or row.get('matched-at') or row.get('matched_at', '')
+                lines.append(f"- [{severity}] {name} @ {host}")
         lines.append("")
 
     if data.get('urlscan'):
@@ -220,26 +254,66 @@ def _module_list(data, key):
         return val
     return []
 
+def _is_error(val):
+    """True if module returned an error dict."""
+    return isinstance(val, dict) and val.get('error') is not None
+
+def _markdown_to_html(text):
+    """Convert basic Markdown (**, *, ##, #, newlines) to HTML. Escapes first for safety."""
+    if not text:
+        return ''
+    t = _escape_html(str(text))
+    # Headings first (so they get their own lines)
+    t = re.sub(r'^### (.+)$', r'<h4 style="color: var(--accent-primary); margin: 1rem 0 0.5rem 0;">\1</h4>', t, flags=re.MULTILINE)
+    t = re.sub(r'^## (.+)$', r'<h3 style="color: var(--accent-primary); margin: 1rem 0 0.5rem 0;">\1</h3>', t, flags=re.MULTILINE)
+    t = re.sub(r'^# (.+)$', r'<h2 style="color: var(--accent-secondary); margin: 1.25rem 0 0.5rem 0;">\1</h2>', t, flags=re.MULTILINE)
+    # Bold **...** (before single * so ** is consumed first)
+    t = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', t)
+    # Italic *...*
+    t = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', t)
+    # Newlines to <br>
+    t = t.replace('\n', '<br>\n')
+    return t
+
 def save_html_report(data, output_dir, ai_summary=None):
-    """Generates and saves a professional, interactive HTML dashboard report."""
+    """Generates and saves a professional, highly animated cybersecurity dashboard report."""
     
-    # Calculate statistics (use _module_list so error dicts don't break counts)
+    # Calculate statistics
     total_open_ports = 0
     critical_ports = 0
-    total_subdomains = len(_module_list(data, 'subenum')) + len(_module_list(data, 'lab')) + len(_module_list(data, 'subfuzz'))
+    total_subdomains = len(_module_list(data, 'subenum')) + len(_module_list(data, 'lab'))
     total_dirs = len(_module_list(data, 'dirfuzz'))
     sql_vulnerable = data.get('sqlmap', {}).get('vulnerable', False)
     
+    # Build network topology data for animation
+    network_nodes = []
+    network_connections = []
+    
     if 'nmap' in data and data.get('nmap'):
-        for host in data['nmap']:
+        for host_idx, host in enumerate(data['nmap']):
             for port in host['ports']:
                 if port['state'] == 'open':
                     total_open_ports += 1
-                    if port['portid'] in ['21', '22', '23', '80', '443', '3306', '3389', '8080']:
+                    is_critical = port['portid'] in ['21', '22', '23', '80', '443', '3306', '3389', '8080']
+                    if is_critical:
                         critical_ports += 1
+                    
+                    network_nodes.append({
+                        'id': f"host_{host_idx}_port_{port['portid']}",
+                        'type': 'port',
+                        'label': f"{host['ip']}:{port['portid']}",
+                        'critical': is_critical,
+                        'service': port.get('service', {}).get('name', 'unknown')
+                    })
     
     risk_level = "High" if (sql_vulnerable or critical_ports > 3) else ("Medium" if critical_ports > 0 else "Low")
     risk_color = "#ef4444" if risk_level == "High" else ("#f59e0b" if risk_level == "Medium" else "#10b981")
+    
+    # Convert network data to JSON
+    network_data_json = json.dumps({
+        'nodes': network_nodes,
+        'connections': network_connections
+    })
     
     html = f"""
     <!DOCTYPE html>
@@ -247,8 +321,8 @@ def save_html_report(data, output_dir, ai_summary=None):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>ReconX Security Assessment Dashboard</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <title>ReconX - Professional Security Assessment Dashboard</title>
+        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
             * {{
                 margin: 0;
@@ -257,88 +331,167 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             :root {{
-                --bg-primary: #0f172a;
-                --bg-secondary: #1e293b;
-                --bg-tertiary: #334155;
-                --text-primary: #f1f5f9;
-                --text-secondary: #cbd5e1;
-                --text-muted: #94a3b8;
-                --accent-primary: #3b82f6;
-                --accent-secondary: #8b5cf6;
+                --bg-primary: #0a0e1a;
+                --bg-secondary: #0f1419;
+                --bg-tertiary: #1a1f2e;
+                --bg-card: #141922;
+                --text-primary: #e8eaed;
+                --text-secondary: #9ca3af;
+                --text-muted: #6b7280;
+                --accent-primary: #00ff88;
+                --accent-secondary: #00d4ff;
+                --accent-purple: #a78bfa;
                 --success: #10b981;
                 --warning: #f59e0b;
                 --danger: #ef4444;
-                --border-color: #334155;
-                --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
-            }}
-            
-            body.light-mode {{
-                --bg-primary: #f8fafc;
-                --bg-secondary: #ffffff;
-                --bg-tertiary: #f1f5f9;
-                --text-primary: #0f172a;
-                --text-secondary: #475569;
-                --text-muted: #64748b;
-                --border-color: #e2e8f0;
-                --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                --border-color: #1f2937;
+                --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+                --glow-blue: 0 0 20px rgba(0, 212, 255, 0.3);
+                --glow-red: 0 0 20px rgba(239, 68, 68, 0.3);
             }}
             
             body {{
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
                 background: var(--bg-primary);
                 color: var(--text-primary);
                 line-height: 1.6;
-                transition: background-color 0.3s ease, color 0.3s ease;
+                overflow-x: hidden;
+                position: relative;
             }}
             
+            /* Animated Background Grid */
+            .grid-background {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-image: 
+                    linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+                background-size: 50px 50px;
+                animation: gridMove 20s linear infinite;
+                z-index: 0;
+                pointer-events: none;
+            }}
+            
+            @keyframes gridMove {{
+                0% {{ background-position: 0 0; }}
+                100% {{ background-position: 50px 50px; }}
+            }}
+            
+            /* Particle System */
+            .particles-container {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1;
+                pointer-events: none;
+                overflow: hidden;
+            }}
+            
+            .particle {{
+                position: absolute;
+                width: 2px;
+                height: 2px;
+                background: var(--accent-primary);
+                border-radius: 50%;
+                opacity: 0;
+                animation: particleFloat 15s linear infinite;
+            }}
+            
+            @keyframes particleFloat {{
+                0% {{
+                    transform: translateY(100vh) translateX(0);
+                    opacity: 0;
+                }}
+                10% {{ opacity: 1; }}
+                90% {{ opacity: 1; }}
+                100% {{
+                    transform: translateY(-100vh) translateX(100px);
+                    opacity: 0;
+                }}
+            }}
+            
+            /* Neural Network Canvas */
+            #network-canvas {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1;
+                pointer-events: none;
+                opacity: 0.4;
+            }}
+            
+            /* Main Container */
             .dashboard {{
-                max-width: 1400px;
+                position: relative;
+                z-index: 10;
+                max-width: 1600px;
                 margin: 0 auto;
                 padding: 2rem;
             }}
             
-            /* Header */
+            /* Cyberpunk Header */
             .header {{
-                background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-                border-radius: 16px;
-                padding: 2.5rem;
-                margin-bottom: 2rem;
-                box-shadow: var(--shadow-lg);
                 position: relative;
+                background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 212, 255, 0.1));
+                border: 1px solid var(--accent-primary);
+                border-radius: 16px;
+                padding: 3rem;
+                margin-bottom: 2rem;
                 overflow: hidden;
+                box-shadow: var(--glow-green), 0 10px 40px rgba(0, 0, 0, 0.5);
             }}
             
             .header::before {{
                 content: '';
                 position: absolute;
-                top: 0;
-                right: 0;
-                width: 300px;
-                height: 300px;
-                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-                border-radius: 50%;
-                transform: translate(30%, -30%);
+                top: -50%;
+                right: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, rgba(0, 255, 136, 0.1) 0%, transparent 70%);
+                animation: headerPulse 8s ease-in-out infinite;
+            }}
+            
+            @keyframes headerPulse {{
+                0%, 100% {{ transform: scale(1) rotate(0deg); opacity: 0.5; }}
+                50% {{ transform: scale(1.1) rotate(180deg); opacity: 0.8; }}
             }}
             
             .header-content {{
                 position: relative;
-                z-index: 1;
+                z-index: 2;
             }}
             
             .header h1 {{
-                font-size: 2.5rem;
-                font-weight: 700;
-                color: white;
+                font-size: 3rem;
+                font-weight: 800;
+                background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
                 margin-bottom: 0.5rem;
-                letter-spacing: -0.5px;
+                letter-spacing: -1px;
+                text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+                animation: textGlow 3s ease-in-out infinite;
+            }}
+            
+            @keyframes textGlow {{
+                0%, 100% {{ filter: brightness(1); }}
+                50% {{ filter: brightness(1.3); }}
             }}
             
             .header .subtitle {{
-                color: rgba(255, 255, 255, 0.9);
+                color: var(--text-secondary);
                 font-size: 1.1rem;
                 font-weight: 400;
+                font-family: 'JetBrains Mono', monospace;
             }}
             
             .header-actions {{
@@ -347,53 +500,93 @@ def save_html_report(data, output_dir, ai_summary=None):
                 right: 2rem;
                 display: flex;
                 gap: 1rem;
-                z-index: 2;
+                z-index: 3;
             }}
             
             .btn {{
                 padding: 0.75rem 1.5rem;
-                border: none;
+                border: 1px solid var(--accent-primary);
                 border-radius: 8px;
                 font-weight: 500;
                 cursor: pointer;
-                transition: all 0.2s ease;
+                transition: all 0.3s ease;
                 font-size: 0.9rem;
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
+                background: rgba(0, 255, 136, 0.05);
+                color: var(--accent-primary);
+                font-family: 'JetBrains Mono', monospace;
+                position: relative;
+                overflow: hidden;
             }}
             
-            .btn-primary {{
-                background: rgba(255, 255, 255, 0.2);
-                color: white;
-                backdrop-filter: blur(10px);
+            .btn::before {{
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 0;
+                height: 0;
+                border-radius: 50%;
+                background: rgba(0, 255, 136, 0.2);
+                transform: translate(-50%, -50%);
+                transition: width 0.5s, height 0.5s;
             }}
             
-            .btn-primary:hover {{
-                background: rgba(255, 255, 255, 0.3);
+            .btn:hover::before {{
+                width: 300px;
+                height: 300px;
+            }}
+            
+            .btn:hover {{
+                background: rgba(0, 255, 136, 0.1);
+                box-shadow: var(--glow-green);
                 transform: translateY(-2px);
             }}
             
-            /* Stats Grid */
+            .btn span {{
+                position: relative;
+                z-index: 1;
+            }}
+            
+            /* Holographic Stats Grid */
             .stats-grid {{
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
                 gap: 1.5rem;
                 margin-bottom: 2rem;
             }}
             
             .stat-card {{
-                background: var(--bg-secondary);
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
                 border-radius: 12px;
                 padding: 1.5rem;
-                box-shadow: var(--shadow);
-                border: 1px solid var(--border-color);
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                position: relative;
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }}
+            
+            .stat-card::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+                transition: left 0.5s;
+            }}
+            
+            .stat-card:hover::before {{
+                left: 100%;
             }}
             
             .stat-card:hover {{
                 transform: translateY(-4px);
-                box-shadow: var(--shadow-lg);
+                border-color: var(--accent-primary);
+                box-shadow: var(--glow-green);
             }}
             
             .stat-header {{
@@ -405,33 +598,45 @@ def save_html_report(data, output_dir, ai_summary=None):
             
             .stat-label {{
                 color: var(--text-muted);
-                font-size: 0.875rem;
-                font-weight: 500;
+                font-size: 0.75rem;
+                font-weight: 600;
                 text-transform: uppercase;
-                letter-spacing: 0.5px;
+                letter-spacing: 1px;
+                font-family: 'JetBrains Mono', monospace;
             }}
             
             .stat-icon {{
-                width: 40px;
-                height: 40px;
-                border-radius: 10px;
+                width: 45px;
+                height: 45px;
+                border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.2rem;
+                font-size: 1.3rem;
+                background: rgba(0, 255, 136, 0.1);
+                border: 1px solid var(--accent-primary);
+                animation: iconPulse 2s ease-in-out infinite;
+            }}
+            
+            @keyframes iconPulse {{
+                0%, 100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }}
+                50% {{ transform: scale(1.05); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }}
             }}
             
             .stat-value {{
                 font-size: 2.5rem;
                 font-weight: 700;
-                color: var(--text-primary);
+                color: var(--accent-primary);
+                font-family: 'JetBrains Mono', monospace;
                 line-height: 1;
+                text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
             }}
             
             .stat-change {{
                 margin-top: 0.5rem;
                 font-size: 0.875rem;
                 color: var(--text-muted);
+                font-family: 'JetBrains Mono', monospace;
             }}
             
             /* Risk Badge */
@@ -444,20 +649,63 @@ def save_html_report(data, output_dir, ai_summary=None):
                 font-weight: 600;
                 font-size: 0.875rem;
                 margin-top: 0.5rem;
+                border: 1px solid;
+                animation: riskPulse 2s ease-in-out infinite;
             }}
             
-            .risk-high {{ background: rgba(239, 68, 68, 0.1); color: var(--danger); }}
-            .risk-medium {{ background: rgba(245, 158, 11, 0.1); color: var(--warning); }}
-            .risk-low {{ background: rgba(16, 185, 129, 0.1); color: var(--success); }}
+            .risk-high {{ 
+                background: rgba(239, 68, 68, 0.1); 
+                color: var(--danger); 
+                border-color: var(--danger);
+                box-shadow: var(--glow-red);
+            }}
+            .risk-medium {{ 
+                background: rgba(245, 158, 11, 0.1); 
+                color: var(--warning); 
+                border-color: var(--warning);
+            }}
+            .risk-low {{ 
+                background: rgba(16, 185, 129, 0.1); 
+                color: var(--success); 
+                border-color: var(--success);
+            }}
+            
+            @keyframes riskPulse {{
+                0%, 100% {{ opacity: 1; }}
+                50% {{ opacity: 0.7; }}
+            }}
             
             /* Module Sections */
             .module-section {{
-                background: var(--bg-secondary);
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
                 border-radius: 12px;
                 padding: 1.5rem;
                 margin-bottom: 1.5rem;
-                box-shadow: var(--shadow);
-                border: 1px solid var(--border-color);
+                position: relative;
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }}
+            
+            .module-section::after {{
+                content: '';
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 2px;
+                height: 100%;
+                background: linear-gradient(180deg, transparent, var(--accent-primary), transparent);
+                animation: scanLine 3s linear infinite;
+            }}
+            
+            @keyframes scanLine {{
+                0% {{ transform: translateY(-100%); }}
+                100% {{ transform: translateY(100%); }}
+            }}
+            
+            .module-section:hover {{
+                border-color: var(--accent-primary);
+                box-shadow: var(--glow-green);
             }}
             
             .module-header {{
@@ -466,32 +714,34 @@ def save_html_report(data, output_dir, ai_summary=None):
                 align-items: center;
                 margin-bottom: 1.5rem;
                 padding-bottom: 1rem;
-                border-bottom: 2px solid var(--border-color);
+                border-bottom: 1px solid var(--border-color);
                 cursor: pointer;
                 user-select: none;
             }}
             
             .module-title {{
                 font-size: 1.5rem;
-                font-weight: 600;
+                font-weight: 700;
                 color: var(--text-primary);
                 display: flex;
                 align-items: center;
                 gap: 0.75rem;
+                font-family: 'JetBrains Mono', monospace;
             }}
             
             .module-badge {{
-                background: var(--accent-primary);
-                color: white;
+                background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+                color: var(--bg-primary);
                 padding: 0.25rem 0.75rem;
                 border-radius: 12px;
                 font-size: 0.75rem;
-                font-weight: 600;
+                font-weight: 700;
+                box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
             }}
             
             .collapse-icon {{
                 transition: transform 0.3s ease;
-                color: var(--text-muted);
+                color: var(--accent-primary);
                 font-size: 1.5rem;
             }}
             
@@ -510,7 +760,7 @@ def save_html_report(data, output_dir, ai_summary=None):
                 opacity: 0;
             }}
             
-            /* Tables */
+            /* Futuristic Tables */
             .data-table {{
                 width: 100%;
                 border-collapse: separate;
@@ -519,53 +769,80 @@ def save_html_report(data, output_dir, ai_summary=None):
             }}
             
             .data-table thead {{
-                background: var(--bg-tertiary);
+                background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 212, 255, 0.1));
             }}
             
             .data-table th {{
                 padding: 1rem;
                 text-align: left;
-                font-weight: 600;
-                color: var(--text-primary);
-                font-size: 0.875rem;
+                font-weight: 700;
+                color: var(--accent-primary);
+                font-size: 0.75rem;
                 text-transform: uppercase;
-                letter-spacing: 0.5px;
-                border-bottom: 2px solid var(--border-color);
-            }}
-            
-            .data-table th:first-child {{
-                border-top-left-radius: 8px;
-            }}
-            
-            .data-table th:last-child {{
-                border-top-right-radius: 8px;
+                letter-spacing: 1px;
+                border-bottom: 2px solid var(--accent-primary);
+                font-family: 'JetBrains Mono', monospace;
             }}
             
             .data-table td {{
                 padding: 1rem;
                 border-bottom: 1px solid var(--border-color);
                 color: var(--text-secondary);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.875rem;
             }}
             
             .data-table tbody tr {{
-                transition: background-color 0.2s ease;
+                transition: all 0.2s ease;
+                position: relative;
+            }}
+            
+            .data-table tbody tr::before {{
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 0;
+                height: 100%;
+                background: linear-gradient(90deg, var(--accent-primary), transparent);
+                transition: width 0.3s ease;
+                opacity: 0.1;
+            }}
+            
+            .data-table tbody tr:hover::before {{
+                width: 100%;
             }}
             
             .data-table tbody tr:hover {{
-                background: var(--bg-tertiary);
+                background: rgba(0, 255, 136, 0.02);
             }}
             
-            /* Code/Pre blocks */
+            /* Code Blocks */
             .code-block {{
-                background: var(--bg-tertiary);
+                background: var(--bg-primary);
                 border: 1px solid var(--border-color);
+                border-left: 3px solid var(--accent-primary);
                 border-radius: 8px;
                 padding: 1.5rem;
                 overflow-x: auto;
-                font-family: 'Fira Code', 'Courier New', monospace;
+                font-family: 'JetBrains Mono', monospace;
                 font-size: 0.875rem;
-                line-height: 1.6;
+                line-height: 1.8;
                 color: var(--text-secondary);
+                position: relative;
+            }}
+            
+            .code-block.ai-summary-html::before {{
+                content: '> AI SUMMARY';
+            }}
+            .code-block::before {{
+                content: '> EXECUTION LOG';
+                position: absolute;
+                top: 0.5rem;
+                right: 1rem;
+                font-size: 0.65rem;
+                color: var(--text-muted);
+                opacity: 0.5;
             }}
             
             /* Lists */
@@ -579,15 +856,29 @@ def save_html_report(data, output_dir, ai_summary=None):
                 display: flex;
                 align-items: center;
                 gap: 1rem;
-                transition: background-color 0.2s ease;
+                transition: all 0.2s ease;
+                position: relative;
+            }}
+            
+            .list-item::before {{
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 50%;
+                width: 0;
+                height: 2px;
+                background: var(--accent-primary);
+                transition: width 0.3s ease;
+                transform: translateY(-50%);
+            }}
+            
+            .list-item:hover::before {{
+                width: 5px;
             }}
             
             .list-item:hover {{
-                background: var(--bg-tertiary);
-            }}
-            
-            .list-item:last-child {{
-                border-bottom: none;
+                background: rgba(0, 255, 136, 0.02);
+                padding-left: 1.5rem;
             }}
             
             .list-bullet {{
@@ -596,6 +887,13 @@ def save_html_report(data, output_dir, ai_summary=None):
                 border-radius: 50%;
                 background: var(--accent-primary);
                 flex-shrink: 0;
+                box-shadow: 0 0 10px rgba(0, 255, 136, 0.8);
+                animation: bulletPulse 2s ease-in-out infinite;
+            }}
+            
+            @keyframes bulletPulse {{
+                0%, 100% {{ transform: scale(1); }}
+                50% {{ transform: scale(1.2); }}
             }}
             
             /* Tags */
@@ -604,36 +902,58 @@ def save_html_report(data, output_dir, ai_summary=None):
                 padding: 0.25rem 0.75rem;
                 border-radius: 6px;
                 font-size: 0.75rem;
-                font-weight: 500;
+                font-weight: 600;
                 margin-right: 0.5rem;
                 margin-bottom: 0.5rem;
+                font-family: 'JetBrains Mono', monospace;
+                border: 1px solid;
             }}
             
-            .tag-primary {{ background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); }}
-            .tag-success {{ background: rgba(16, 185, 129, 0.1); color: var(--success); }}
-            .tag-warning {{ background: rgba(245, 158, 11, 0.1); color: var(--warning); }}
-            .tag-danger {{ background: rgba(239, 68, 68, 0.1); color: var(--danger); }}
+            .tag-primary {{ 
+                background: rgba(0, 212, 255, 0.1); 
+                color: var(--accent-secondary); 
+                border-color: var(--accent-secondary);
+            }}
+            .tag-success {{ 
+                background: rgba(16, 185, 129, 0.1); 
+                color: var(--success); 
+                border-color: var(--success);
+            }}
+            .tag-warning {{ 
+                background: rgba(245, 158, 11, 0.1); 
+                color: var(--warning); 
+                border-color: var(--warning);
+            }}
+            .tag-danger {{ 
+                background: rgba(239, 68, 68, 0.1); 
+                color: var(--danger); 
+                border-color: var(--danger);
+            }}
             
-            /* Port badge */
+            /* Port Badge */
             .port-badge {{
-                font-family: 'Fira Code', monospace;
-                font-weight: 600;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 700;
                 padding: 0.25rem 0.5rem;
                 border-radius: 4px;
                 font-size: 0.875rem;
+                border: 1px solid;
             }}
             
             .port-critical {{
                 background: rgba(239, 68, 68, 0.1);
                 color: var(--danger);
+                border-color: var(--danger);
+                box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
             }}
             
             .port-normal {{
-                background: rgba(59, 130, 246, 0.1);
-                color: var(--accent-primary);
+                background: rgba(0, 212, 255, 0.1);
+                color: var(--accent-secondary);
+                border-color: var(--accent-secondary);
             }}
             
-            /* Alert boxes */
+            /* Alert Boxes */
             .alert {{
                 padding: 1.25rem;
                 border-radius: 8px;
@@ -642,30 +962,80 @@ def save_html_report(data, output_dir, ai_summary=None):
                 align-items: flex-start;
                 gap: 1rem;
                 border-left: 4px solid;
+                position: relative;
+                overflow: hidden;
+            }}
+            
+            .alert::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.05) 50%, transparent 70%);
+                animation: alertShimmer 3s linear infinite;
+            }}
+            
+            @keyframes alertShimmer {{
+                0% {{ transform: translateX(-100%); }}
+                100% {{ transform: translateX(100%); }}
             }}
             
             .alert-info {{
-                background: rgba(59, 130, 246, 0.1);
-                border-color: var(--accent-primary);
-                color: var(--text-primary);
+                background: rgba(0, 212, 255, 0.05);
+                border-color: var(--accent-secondary);
             }}
             
             .alert-warning {{
-                background: rgba(245, 158, 11, 0.1);
+                background: rgba(245, 158, 11, 0.05);
                 border-color: var(--warning);
-                color: var(--text-primary);
             }}
             
             .alert-danger {{
-                background: rgba(239, 68, 68, 0.1);
+                background: rgba(239, 68, 68, 0.05);
                 border-color: var(--danger);
-                color: var(--text-primary);
             }}
             
             .alert-success {{
-                background: rgba(16, 185, 129, 0.1);
+                background: rgba(16, 185, 129, 0.05);
                 border-color: var(--success);
-                color: var(--text-primary);
+            }}
+            
+            /* Terminal-style time display */
+            .terminal-time {{
+                position: fixed;
+                top: 1rem;
+                left: 1rem;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.75rem;
+                color: var(--accent-primary);
+                background: rgba(0, 0, 0, 0.5);
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                border: 1px solid var(--accent-primary);
+                z-index: 1000;
+                box-shadow: var(--glow-green);
+            }}
+            
+            /* Loading Bar Animation */
+            .loading-bar {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 3px;
+                background: var(--accent-primary);
+                transform-origin: left;
+                animation: loadingProgress 2s ease-in-out infinite;
+                z-index: 9999;
+                box-shadow: 0 0 10px var(--accent-primary);
+            }}
+            
+            @keyframes loadingProgress {{
+                0% {{ transform: scaleX(0); }}
+                50% {{ transform: scaleX(0.7); }}
+                100% {{ transform: scaleX(1); }}
             }}
             
             /* Footer */
@@ -675,91 +1045,72 @@ def save_html_report(data, output_dir, ai_summary=None):
                 color: var(--text-muted);
                 font-size: 0.875rem;
                 margin-top: 3rem;
+                font-family: 'JetBrains Mono', monospace;
+                border-top: 1px solid var(--border-color);
             }}
             
             /* Responsive */
             @media (max-width: 768px) {{
-                .dashboard {{
-                    padding: 1rem;
-                }}
-                
-                .header {{
-                    padding: 1.5rem;
-                }}
-                
-                .header h1 {{
-                    font-size: 1.75rem;
-                }}
-                
+                .dashboard {{ padding: 1rem; }}
+                .header {{ padding: 1.5rem; }}
+                .header h1 {{ font-size: 2rem; }}
                 .header-actions {{
                     position: static;
                     margin-top: 1rem;
+                    flex-direction: column;
                 }}
-                
-                .stats-grid {{
-                    grid-template-columns: 1fr;
-                }}
+                .stats-grid {{ grid-template-columns: 1fr; }}
             }}
-            
-            /* Animations */
-            @keyframes fadeIn {{
-                from {{
-                    opacity: 0;
-                    transform: translateY(10px);
-                }}
-                to {{
-                    opacity: 1;
-                    transform: translateY(0);
-                }}
-            }}
-            
-            .module-section {{
-                animation: fadeIn 0.5s ease forwards;
-            }}
-            
-            .module-section:nth-child(1) {{ animation-delay: 0.1s; }}
-            .module-section:nth-child(2) {{ animation-delay: 0.2s; }}
-            .module-section:nth-child(3) {{ animation-delay: 0.3s; }}
-            .module-section:nth-child(4) {{ animation-delay: 0.4s; }}
             
             /* Scrollbar */
-            ::-webkit-scrollbar {{
-                width: 10px;
-                height: 10px;
-            }}
-            
-            ::-webkit-scrollbar-track {{
-                background: var(--bg-primary);
-            }}
-            
-            ::-webkit-scrollbar-thumb {{
-                background: var(--bg-tertiary);
+            ::-webkit-scrollbar {{ width: 10px; height: 10px; }}
+            ::-webkit-scrollbar-track {{ background: var(--bg-primary); }}
+            ::-webkit-scrollbar-thumb {{ 
+                background: var(--accent-primary); 
                 border-radius: 5px;
+                box-shadow: 0 0 10px var(--accent-primary);
             }}
-            
-            ::-webkit-scrollbar-thumb:hover {{
-                background: var(--border-color);
+            ::-webkit-scrollbar-thumb:hover {{ 
+                background: var(--accent-secondary); 
             }}
         </style>
     </head>
     <body>
+        <!-- Loading Bar -->
+        <div class="loading-bar"></div>
+        
+        <!-- Terminal Time Display -->
+        <div class="terminal-time">
+            <span id="current-time"></span>
+        </div>
+        
+        <!-- Animated Background Grid -->
+        <div class="grid-background"></div>
+        
+        <!-- Particles Container -->
+        <div class="particles-container" id="particles"></div>
+        
+        <!-- Neural Network Canvas -->
+        <canvas id="network-canvas"></canvas>
+        
         <div class="dashboard">
             <!-- Header -->
             <div class="header">
                 <div class="header-actions">
-                    <button class="btn btn-primary" onclick="toggleTheme()">
-                        <span id="theme-icon">🌙</span>
-                        <span id="theme-text">Dark Mode</span>
+                    <button class="btn" onclick="window.print()">
+                        <span>📄</span>
+                        <span>EXPORT PDF</span>
                     </button>
-                    <button class="btn btn-primary" onclick="window.print()">
-                        📄 Export PDF
+                    <button class="btn" onclick="toggleFullscreen()">
+                        <span>⛶</span>
+                        <span>FULLSCREEN</span>
                     </button>
                 </div>
                 <div class="header-content">
-                    <h1>🛡️ ReconX Security Assessment</h1>
-                    <p class="subtitle">Comprehensive Reconnaissance & Vulnerability Analysis Report</p>
+                    <h1>⚡ RECONX SECURITY PLATFORM</h1>
+                    <p class="subtitle">&gt; COMPREHENSIVE RECONNAISSANCE & VULNERABILITY ANALYSIS SYSTEM</p>
                     <div class="risk-badge risk-{risk_level.lower()}">
-                        {'🔴' if risk_level == 'High' else ('🟡' if risk_level == 'Medium' else '🟢')} Risk Level: {risk_level}
+                        {'🔴' if risk_level == 'High' else ('🟡' if risk_level == 'Medium' else '🟢')} THREAT LEVEL: {risk_level.upper()}
                     </div>
                 </div>
             </div>
@@ -768,38 +1119,38 @@ def save_html_report(data, output_dir, ai_summary=None):
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">Open Ports</span>
-                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary);">🔌</div>
+                        <span class="stat-label">OPEN PORTS</span>
+                        <div class="stat-icon">🔌</div>
                     </div>
                     <div class="stat-value">{total_open_ports}</div>
-                    <div class="stat-change">{critical_ports} critical services detected</div>
+                    <div class="stat-change">> {critical_ports} critical services detected</div>
                 </div>
                 
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">Subdomains</span>
-                        <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--accent-secondary);">🌐</div>
+                        <span class="stat-label">SUBDOMAINS</span>
+                        <div class="stat-icon">🌐</div>
                     </div>
                     <div class="stat-value">{total_subdomains}</div>
-                    <div class="stat-change">Total discovered domains</div>
+                    <div class="stat-change">> total enumerated domains</div>
                 </div>
                 
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">Directories</span>
-                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">📁</div>
+                        <span class="stat-label">DIRECTORIES</span>
+                        <div class="stat-icon">📁</div>
                     </div>
                     <div class="stat-value">{total_dirs}</div>
-                    <div class="stat-change">Enumerated paths</div>
+                    <div class="stat-change">> discovered paths</div>
                 </div>
                 
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">SQL Injection</span>
-                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">💉</div>
+                        <span class="stat-label">SQL INJECTION</span>
+                        <div class="stat-icon">💉</div>
                     </div>
-                    <div class="stat-value">{'⚠️' if sql_vulnerable else '✓'}</div>
-                    <div class="stat-change">{'Vulnerable!' if sql_vulnerable else 'Not detected'}</div>
+                    <div class="stat-value">{'⚠' if sql_vulnerable else '✓'}</div>
+                    <div class="stat-change">{'> VULNERABILITY CONFIRMED' if sql_vulnerable else '> not detected'}</div>
                 </div>
             </div>
     """
@@ -810,8 +1161,8 @@ def save_html_report(data, output_dir, ai_summary=None):
             <div class="module-section">
                 <div class="module-header" onclick="toggleSection(this)">
                     <div class="module-title">
-                        🤖 AI-Powered Analysis
-                        <span class="module-badge">Executive Summary</span>
+                        🤖 AI-POWERED ANALYSIS
+                        <span class="module-badge">EXECUTIVE SUMMARY</span>
                     </div>
                     <span class="collapse-icon">▼</span>
                 </div>
@@ -820,10 +1171,10 @@ def save_html_report(data, output_dir, ai_summary=None):
                         <span style="font-size: 1.5rem;">ℹ️</span>
                         <div>
                             <strong>Automated Intelligence Summary</strong>
-                            <p style="margin-top: 0.5rem; opacity: 0.9;">Generated by AI analysis of all reconnaissance modules</p>
+                            <p style="margin-top: 0.5rem; opacity: 0.9;">> Generated by advanced AI analysis of all reconnaissance modules</p>
                         </div>
                     </div>
-                    <div class="code-block">{_escape_html(ai_summary).replace(chr(10), '<br>')}</div>
+                    <div class="code-block ai-summary-html">{_markdown_to_html(ai_summary)}</div>
                 </div>
             </div>
         """
@@ -835,8 +1186,8 @@ def save_html_report(data, output_dir, ai_summary=None):
             <div class="module-section">
                 <div class="module-header" onclick="toggleSection(this)">
                     <div class="module-title">
-                        🔍 Network Mapping
-                        <span class="module-badge">{total_ports} Open Ports</span>
+                        🔍 NETWORK MAPPING
+                        <span class="module-badge">{total_ports} OPEN PORTS</span>
                     </div>
                     <span class="collapse-icon">▼</span>
                 </div>
@@ -847,17 +1198,17 @@ def save_html_report(data, output_dir, ai_summary=None):
             open_ports = [p for p in host['ports'] if p['state'] == 'open']
             if open_ports:
                 html += f"""
-                    <h3 style="color: var(--text-primary); margin: 1.5rem 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
-                        🖥️ Host: <span style="color: var(--accent-primary);">{_escape_html(host['ip'])}</span>
+                    <h3 style="color: var(--accent-primary); margin: 1.5rem 0 1rem 0; display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace;">
+                        🖥️ HOST: <span style="color: var(--accent-secondary);">{_escape_html(host['ip'])}</span>
                     </h3>
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Port</th>
-                                <th>Protocol</th>
-                                <th>Service</th>
-                                <th>Product</th>
-                                <th>Version</th>
+                                <th>PORT</th>
+                                <th>PROTOCOL</th>
+                                <th>SERVICE</th>
+                                <th>PRODUCT</th>
+                                <th>VERSION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -888,167 +1239,17 @@ def save_html_report(data, output_dir, ai_summary=None):
             </div>
         """
 
-    # WhatWeb Results
-    if 'whatweb' in data and data.get('whatweb'):
-        tech_count = sum(len(tech.get('plugins', {})) for tech in data['whatweb'])
+    # Subdomains (subenum + lab)
+    subenum_list = _module_list(data, 'subenum')
+    lab_list = _module_list(data, 'lab')
+    if subenum_list or lab_list:
+        all_subs = list(subenum_list) + list(lab_list)
         html += f"""
             <div class="module-section">
                 <div class="module-header" onclick="toggleSection(this)">
                     <div class="module-title">
-                        🌐 Web Technologies
-                        <span class="module-badge">{tech_count} Technologies</span>
-                    </div>
-                    <span class="collapse-icon">▼</span>
-                </div>
-                <div class="module-content">
-        """
-        
-        for tech in data['whatweb']:
-            html += f"""
-                <h3 style="color: var(--text-primary); margin: 1.5rem 0 1rem 0;">
-                    🎯 Target: <span style="color: var(--accent-primary);">{_escape_html(tech.get('target'))}</span>
-                </h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Technology</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            
-            for plugin, info in tech.get('plugins', {}).items():
-                details = []
-                if 'version' in info and info['version']:
-                    details.append(f"<span class='tag tag-primary'>v{', '.join(map(str, info['version']))}</span>")
-                if 'string' in info and info['string']:
-                    for s in info['string']:
-                        details.append(f"<span class='tag tag-success'>{_escape_html(str(s))}</span>")
-                
-                html += f"""
-                    <tr>
-                        <td><strong>{_escape_html(plugin)}</strong></td>
-                        <td>{' '.join(details) if details else 'N/A'}</td>
-                    </tr>
-                """
-            
-            html += """
-                    </tbody>
-                </table>
-            """
-        
-        html += """
-                </div>
-            </div>
-        """
-
-    # URLScan.io Results
-    if 'urlscan' in data and data.get('urlscan'):
-        urlscan = data['urlscan']
-        html += """
-            <div class="module-section">
-                <div class="module-header" onclick="toggleSection(this)">
-                    <div class="module-title">
-                        🔎 URLScan.io Analysis
-                        <span class="module-badge">External Intelligence</span>
-                    </div>
-                    <span class="collapse-icon">▼</span>
-                </div>
-                <div class="module-content">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
-        """
-        
-        if urlscan.get('technologies'):
-            html += """
-                <div style="background: var(--bg-tertiary); padding: 1.5rem; border-radius: 8px;">
-                    <h4 style="color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        ⚙️ Technologies Detected
-                    </h4>
-                    <div>
-            """
-            for tech in urlscan['technologies']:
-                html += f"<span class='tag tag-primary'>{_escape_html(tech)}</span>"
-            html += """
-                    </div>
-                </div>
-            """
-        
-        if urlscan.get('ips'):
-            html += """
-                <div style="background: var(--bg-tertiary); padding: 1.5rem; border-radius: 8px;">
-                    <h4 style="color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        🌍 IP Addresses
-                    </h4>
-                    <ul class="list-group">
-            """
-            for ip in urlscan['ips']:
-                html += f"""
-                    <li class="list-item">
-                        <span class="list-bullet"></span>
-                        <code style="color: var(--accent-primary);">{_escape_html(ip)}</code>
-                    </li>
-                """
-            html += """
-                    </ul>
-                </div>
-            """
-        
-        if urlscan.get('domains'):
-            html += """
-                <div style="background: var(--bg-tertiary); padding: 1.5rem; border-radius: 8px;">
-                    <h4 style="color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        🔗 Related Domains
-                    </h4>
-                    <ul class="list-group">
-            """
-            for domain in urlscan['domains']:
-                html += f"""
-                    <li class="list-item">
-                        <span class="list-bullet"></span>
-                        {_escape_html(domain)}
-                    </li>
-                """
-            html += """
-                    </ul>
-                </div>
-            """
-        
-        if urlscan.get('network_calls'):
-            html += f"""
-                <div style="background: var(--bg-tertiary); padding: 1.5rem; border-radius: 8px;">
-                    <h4 style="color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        📡 Network Activity
-                    </h4>
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--accent-primary);">
-                        {len(urlscan['network_calls'])}
-                    </div>
-                    <div style="color: var(--text-muted); font-size: 0.875rem;">Total network calls detected</div>
-                </div>
-            """
-        
-        html += """
-                    </div>
-                </div>
-            </div>
-        """
-
-    # Subdomains - Combined
-    all_subdomains = []
-    for sub in _module_list(data, 'subenum'):
-        all_subdomains.append(('Passive', sub))
-    for sub in _module_list(data, 'lab'):
-        all_subdomains.append(('Lab', sub))
-    for sub in _module_list(data, 'subfuzz'):
-        all_subdomains.append(('Bruteforce', sub))
-    
-    if all_subdomains:
-        html += f"""
-            <div class="module-section">
-                <div class="module-header" onclick="toggleSection(this)">
-                    <div class="module-title">
-                        🗺️ Subdomain Enumeration
-                        <span class="module-badge">{len(all_subdomains)} Discovered</span>
+                        🌐 SUBDOMAINS
+                        <span class="module-badge">{len(all_subs)} DISCOVERED</span>
                     </div>
                     <span class="collapse-icon">▼</span>
                 </div>
@@ -1056,22 +1257,17 @@ def save_html_report(data, output_dir, ai_summary=None):
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Method</th>
-                                <th>Subdomain</th>
+                                <th>SUBDOMAIN</th>
                             </tr>
                         </thead>
                         <tbody>
         """
-        
-        for method, subdomain in all_subdomains:
-            tag_class = 'tag-primary' if method == 'Passive' else ('tag-warning' if method == 'Lab' else 'tag-danger')
+        for sub in all_subs[:200]:
             html += f"""
-                <tr>
-                    <td><span class="tag {tag_class}">{_escape_html(method)}</span></td>
-                    <td><code style="color: var(--accent-primary);">{_escape_html(subdomain)}</code></td>
-                </tr>
+                        <tr>
+                            <td><code>{_escape_html(str(sub))}</code></td>
+                        </tr>
             """
-        
         html += """
                         </tbody>
                     </table>
@@ -1079,242 +1275,419 @@ def save_html_report(data, output_dir, ai_summary=None):
             </div>
         """
 
-    # Directory Fuzzing
+    # Discovered directories (dirfuzz)
     dirfuzz_list = _module_list(data, 'dirfuzz')
     if dirfuzz_list:
         html += f"""
             <div class="module-section">
                 <div class="module-header" onclick="toggleSection(this)">
                     <div class="module-title">
-                        📂 Directory Discovery
-                        <span class="module-badge">{len(dirfuzz_list)} Paths</span>
+                        📁 DISCOVERED DIRECTORIES
+                        <span class="module-badge">{len(dirfuzz_list)} PATHS</span>
                     </div>
                     <span class="collapse-icon">▼</span>
                 </div>
                 <div class="module-content">
-                    <div class="alert alert-warning">
-                        <span style="font-size: 1.5rem;">⚠️</span>
-                        <div>
-                            <strong>Sensitive Paths Detected</strong>
-                            <p style="margin-top: 0.5rem; opacity: 0.9;">Review these directories for exposed sensitive information</p>
-                        </div>
-                    </div>
-                    <ul class="list-group">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>PATH</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         """
-        
-        for entry in dirfuzz_list:
+        for entry in dirfuzz_list[:200]:
             html += f"""
-                <li class="list-item">
-                    <span class="list-bullet"></span>
-                    <code style="color: var(--accent-primary); font-weight: 500;">{_escape_html(entry)}</code>
-                </li>
-            """
-        
-        html += """
-                    </ul>
-                </div>
-            </div>
-        """
-
-    # Nikto Findings
-    nikto_list = _module_list(data, 'nikto')
-    if nikto_list:
-        html += f"""
-            <div class="module-section">
-                <div class="module-header" onclick="toggleSection(this)">
-                    <div class="module-title">
-                        🔒 Nikto Security Scan
-                        <span class="module-badge">{len(nikto_list)} Findings</span>
-                    </div>
-                    <span class="collapse-icon">▼</span>
-                </div>
-                <div class="module-content">
-                    <div class="alert alert-warning">
-                        <span style="font-size: 1.5rem;">⚠️</span>
-                        <div>
-                            <strong>Security Misconfigurations Detected</strong>
-                            <p style="margin-top: 0.5rem; opacity: 0.9;">Potential vulnerabilities and server misconfigurations found</p>
-                        </div>
-                    </div>
-                    <ul class="list-group">
-        """
-        
-        for finding in nikto_list:
-            html += f"""
-                <li class="list-item">
-                    <span class="list-bullet" style="background: var(--warning);"></span>
-                    <span>{_escape_html(finding)}</span>
-                </li>
-            """
-        
-        html += """
-                    </ul>
-                </div>
-            </div>
-        """
-
-    # SQLMap Results
-    if data.get('sqlmap'):
-        sqlmap = data['sqlmap']
-        is_vulnerable = sqlmap.get('vulnerable', False)
-        alert_class = 'alert-danger' if is_vulnerable else 'alert-success'
-        alert_icon = '🚨' if is_vulnerable else '✅'
-        status_text = 'SQL Injection Vulnerability Confirmed' if is_vulnerable else 'No SQL Injection Detected'
-        
-        html += f"""
-            <div class="module-section">
-                <div class="module-header" onclick="toggleSection(this)">
-                    <div class="module-title">
-                        💉 SQL Injection Analysis
-                        <span class="module-badge">{'VULNERABLE' if is_vulnerable else 'Secure'}</span>
-                    </div>
-                    <span class="collapse-icon">▼</span>
-                </div>
-                <div class="module-content">
-                    <div class="alert {alert_class}">
-                        <span style="font-size: 1.5rem;">{alert_icon}</span>
-                        <div>
-                            <strong>{status_text}</strong>
-                            <p style="margin-top: 0.5rem; opacity: 0.9;">
-                                {'Critical vulnerability requires immediate attention' if is_vulnerable else 'Target appears to be protected against SQL injection'}
-                            </p>
-                        </div>
-                    </div>
-        """
-        
-        if is_vulnerable:
-            html += """
-                <table class="data-table">
-                    <thead>
                         <tr>
-                            <th>Category</th>
-                            <th>Details</th>
+                            <td><code>{_escape_html(str(entry))}</code></td>
                         </tr>
-                    </thead>
-                    <tbody>
             """
-            
-            if sqlmap.get('vulnerabilities'):
-                params = ', '.join(sqlmap['vulnerabilities'])
-                html += f"""
-                    <tr>
-                        <td><strong>Vulnerable Parameters</strong></td>
-                        <td><span class="tag tag-danger">{_escape_html(params)}</span></td>
-                    </tr>
-                """
-            
-            if sqlmap.get('db_versions'):
-                dbms = ', '.join(sqlmap['db_versions'])
-                html += f"""
-                    <tr>
-                        <td><strong>Database System</strong></td>
-                        <td><span class="tag tag-warning">{_escape_html(dbms)}</span></td>
-                    </tr>
-                """
-            
-            html += """
-                    </tbody>
-                </table>
-            """
-        
         html += """
+                        </tbody>
+                    </table>
                 </div>
             </div>
         """
 
-    # Errors Section
-    errors = _collect_errors(data)
-    if errors:
+    # WhatWeb
+    if data.get('whatweb') and not _is_error(data.get('whatweb')) and _module_list(data, 'whatweb'):
+        ww_list = _module_list(data, 'whatweb')
         html += f"""
             <div class="module-section">
                 <div class="module-header" onclick="toggleSection(this)">
                     <div class="module-title">
-                        ⚠️ Module Errors
-                        <span class="module-badge">{len(errors)} Issues</span>
+                        🔧 WEB TECHNOLOGIES (WHATWEB)
+                        <span class="module-badge">{len(ww_list)} TARGETS</span>
                     </div>
                     <span class="collapse-icon">▼</span>
                 </div>
                 <div class="module-content">
-                    <div class="alert alert-warning">
-                        <span style="font-size: 1.5rem;">⚠️</span>
-                        <div>
-                            <strong>Some modules encountered errors</strong>
-                            <p style="margin-top: 0.5rem; opacity: 0.9;">These modules failed to complete successfully</p>
-                        </div>
-                    </div>
-                    <ul class="list-group">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>TARGET</th>
+                                <th>PLUGIN</th>
+                                <th>DETAILS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         """
-        
-        for module, message in errors.items():
-            html += f"""
-                <li class="list-item">
-                    <span class="list-bullet" style="background: var(--warning);"></span>
-                    <div>
-                        <strong style="color: var(--text-primary);">{_escape_html(module)}</strong>
-                        <div style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem;">
-                            {_escape_html(message)}
-                        </div>
-                    </div>
-                </li>
-            """
-        
+        for tech in ww_list:
+            if isinstance(tech, dict):
+                target = _escape_html(tech.get('target', ''))
+                for plugin, info in (tech.get('plugins') or {}).items():
+                    details = []
+                    if isinstance(info, dict):
+                        if info.get('version'):
+                            details.append('Version: ' + ', '.join(map(str, info['version'])))
+                        if info.get('string'):
+                            details.append('Info: ' + ', '.join(map(str, info['string'])))
+                    details_str = _escape_html(' | '.join(details)[:80])
+                    html += f"""
+                        <tr>
+                            <td><code>{target}</code></td>
+                            <td><strong>{_escape_html(plugin)}</strong></td>
+                            <td>{details_str}</td>
+                        </tr>
+                    """
         html += """
-                    </ul>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         """
 
-    # Footer
+    # URLScan.io
+    if data.get('urlscan') and not _is_error(data.get('urlscan')):
+        us = data['urlscan']
+        html += """
+            <div class="module-section">
+                <div class="module-header" onclick="toggleSection(this)">
+                    <div class="module-title">
+                        🔗 URLSCAN.IO ANALYSIS
+                        <span class="module-badge">EXTERNAL SCAN</span>
+                    </div>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="module-content">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>CATEGORY</th>
+                                <th>DETAILS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        """
+        if us.get('technologies'):
+            html += f"""
+                        <tr>
+                            <td><strong>Technologies</strong></td>
+                            <td>{_escape_html(', '.join(us['technologies']))}</td>
+                        </tr>
+            """
+        if us.get('domains'):
+            html += f"""
+                        <tr>
+                            <td><strong>Domains</strong></td>
+                            <td>{_escape_html(', '.join(us['domains'][:30]))}</td>
+                        </tr>
+            """
+        if us.get('ips'):
+            html += f"""
+                        <tr>
+                            <td><strong>IPs</strong></td>
+                            <td>{_escape_html(', '.join(us['ips'][:20]))}</td>
+                        </tr>
+            """
+        if us.get('network_calls'):
+            html += f"""
+                        <tr>
+                            <td><strong>Network Calls</strong></td>
+                            <td>{len(us['network_calls'])}</td>
+                        </tr>
+            """
+        html += """
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        """
+
+    # HTTP Probes (httpx)
+    httpx_list = _module_list(data, 'httpx') if data.get('httpx') and not _is_error(data.get('httpx')) else []
+    if httpx_list:
+        html += f"""
+            <div class="module-section">
+                <div class="module-header" onclick="toggleSection(this)">
+                    <div class="module-title">
+                        🌐 HTTP PROBES (HTTPX)
+                        <span class="module-badge">{len(httpx_list)} HOSTS</span>
+                    </div>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="module-content">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                                <th>STATUS</th>
+                                <th>TITLE</th>
+                                <th>TECH</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        """
+        for row in httpx_list[:50]:
+            if isinstance(row, dict):
+                url = _escape_html(row.get('url') or row.get('input') or row.get('host', ''))
+                status = _escape_html(str(row.get('status_code') or row.get('status-code', '')))
+                title = _escape_html((row.get('title') or '')[:60])
+                t = row.get('tech')
+                tech = ', '.join(t[:5]) if isinstance(t, list) else _escape_html(str(t or '')[:40])
+                html += f"""
+                        <tr>
+                            <td><code>{url}</code></td>
+                            <td>{status}</td>
+                            <td>{title}</td>
+                            <td>{tech}</td>
+                        </tr>
+                """
+        html += """
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        """
+
+    # Nuclei findings (show section even when 0 findings so user sees nuclei ran)
+    nuclei_list = _module_list(data, 'nuclei') if data.get('nuclei') and not _is_error(data.get('nuclei')) else []
+    nuclei_err = data.get('nuclei') if _is_error(data.get('nuclei')) else None
+    html += f"""
+            <div class="module-section">
+                <div class="module-header" onclick="toggleSection(this)">
+                    <div class="module-title">
+                        🎯 NUCLEI
+                        <span class="module-badge">{len(nuclei_list)} FINDINGS</span>
+                    </div>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="module-content">
+    """
+    if nuclei_err:
+        html += f"""
+                    <div class="alert alert-info">
+                        <strong>Nuclei run note:</strong> {_escape_html(nuclei_err.get('error', 'Unknown error'))}
+                    </div>
+        """
+    elif nuclei_list:
+        html += """
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>TEMPLATE</th>
+                                <th>SEVERITY</th>
+                                <th>HOST</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        """
+        for row in nuclei_list[:100]:
+            if isinstance(row, dict):
+                info = row.get('info') or {}
+                name = _escape_html(info.get('name') or row.get('template-id') or row.get('templateID', ''))
+                severity = info.get('severity') or row.get('severity', '')
+                sev_class = 'port-critical' if severity in ('critical', 'high') else 'port-normal'
+                host = _escape_html(str(row.get('host') or row.get('matched-at') or row.get('matched_at', ''))[:80])
+                html += f"""
+                        <tr>
+                            <td><strong>{name}</strong></td>
+                            <td><span class="port-badge {sev_class}">{_escape_html(severity)}</span></td>
+                            <td><code>{host}</code></td>
+                        </tr>
+                """
+        html += """
+                        </tbody>
+                    </table>
+        """
+    else:
+        html += """
+                    <div class="alert alert-info">
+                        Nuclei ran successfully; no template findings for this target/severity. Check <code>nuclei.log</code> in the results folder for full output.
+                    </div>
+        """
     html += """
+                </div>
+            </div>
+    """
+
+    html += f"""
             <div class="footer">
-                <p>🛡️ Generated by ReconX Security Assessment Framework</p>
-                <p style="margin-top: 0.5rem; opacity: 0.7;">Professional Penetration Testing & Reconnaissance Tool</p>
+                <p>⚡ POWERED BY RECONX SECURITY ASSESSMENT FRAMEWORK</p>
+                <p style="margin-top: 0.5rem; opacity: 0.7;">> Professional Penetration Testing & Reconnaissance Platform</p>
             </div>
         </div>
         
         <script>
-            // Theme Toggle
-            function toggleTheme() {
-                const body = document.body;
-                const themeIcon = document.getElementById('theme-icon');
-                const themeText = document.getElementById('theme-text');
-                
-                body.classList.toggle('light-mode');
-                
-                if (body.classList.contains('light-mode')) {
-                    themeIcon.textContent = '☀️';
-                    themeText.textContent = 'Light Mode';
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    themeIcon.textContent = '🌙';
-                    themeText.textContent = 'Dark Mode';
-                    localStorage.setItem('theme', 'dark');
-                }
-            }
+            // Neural Network Animation
+            const canvas = document.getElementById('network-canvas');
+            const ctx = canvas.getContext('2d');
             
-            // Section Toggle
-            function toggleSection(header) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            window.addEventListener('resize', () => {{
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }});
+            
+            // Network data from Python
+            const networkData = {network_data_json};
+            
+            class Node {{
+                constructor(x, y, data) {{
+                    this.x = x;
+                    this.y = y;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.data = data;
+                    this.connections = [];
+                    this.pulsePhase = Math.random() * Math.PI * 2;
+                }}
+                
+                update() {{
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    
+                    // Bounce off edges
+                    if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                    if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+                    
+                    // Keep in bounds
+                    this.x = Math.max(0, Math.min(canvas.width, this.x));
+                    this.y = Math.max(0, Math.min(canvas.height, this.y));
+                    
+                    this.pulsePhase += 0.05;
+                }}
+                
+                draw() {{
+                    const pulse = Math.sin(this.pulsePhase) * 0.5 + 0.5;
+                    const size = 3 + pulse * 2;
+                    const opacity = 0.6 + pulse * 0.4;
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.data.critical ? 
+                        `rgba(239, 68, 68, ${{opacity}})` : 
+                        `rgba(0, 255, 136, ${{opacity}})`;
+                    ctx.fill();
+                    
+                    // Glow effect
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = this.data.critical ? '#ef4444' : '#00ff88';
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }}
+            }}
+            
+            // Create nodes
+            const nodes = [];
+            const maxNodes = Math.min(networkData.nodes.length + 20, 50);
+            
+            for (let i = 0; i < maxNodes; i++) {{
+                const nodeData = networkData.nodes[i] || {{ critical: Math.random() > 0.7 }};
+                nodes.push(new Node(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height,
+                    nodeData
+                ));
+            }}
+            
+            function drawConnections() {{
+                for (let i = 0; i < nodes.length; i++) {{
+                    for (let j = i + 1; j < nodes.length; j++) {{
+                        const dx = nodes[i].x - nodes[j].x;
+                        const dy = nodes[i].y - nodes[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 150) {{
+                            const opacity = (1 - distance / 150) * 0.3;
+                            ctx.beginPath();
+                            ctx.moveTo(nodes[i].x, nodes[i].y);
+                            ctx.lineTo(nodes[j].x, nodes[j].y);
+                            ctx.strokeStyle = `rgba(0, 255, 136, ${{opacity}})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }}
+                    }}
+                }}
+            }}
+            
+            function animate() {{
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                drawConnections();
+                
+                nodes.forEach(node => {{
+                    node.update();
+                    node.draw();
+                }});
+                
+                requestAnimationFrame(animate);
+            }}
+            
+            animate();
+            
+            // Create particles
+            function createParticles() {{
+                const container = document.getElementById('particles');
+                for (let i = 0; i < 30; i++) {{
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 15 + 's';
+                    particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                    container.appendChild(particle);
+                }}
+            }}
+            
+            createParticles();
+            
+            // Terminal time display
+            function updateTime() {{
+                const now = new Date();
+                const timeStr = now.toISOString().replace('T', ' ').substr(0, 19);
+                document.getElementById('current-time').textContent = `> ${{timeStr}} UTC`;
+            }}
+            
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // Section toggle
+            function toggleSection(header) {{
                 const section = header.parentElement;
                 section.classList.toggle('collapsed');
-            }
+            }}
             
-            // Load saved theme
-            document.addEventListener('DOMContentLoaded', function() {
-                const savedTheme = localStorage.getItem('theme');
-                if (savedTheme === 'light') {
-                    document.body.classList.add('light-mode');
-                    document.getElementById('theme-icon').textContent = '☀️';
-                    document.getElementById('theme-text').textContent = 'Light Mode';
-                }
-            });
+            // Fullscreen toggle
+            function toggleFullscreen() {{
+                if (!document.fullscreenElement) {{
+                    document.documentElement.requestFullscreen();
+                }} else {{
+                    document.exitFullscreen();
+                }}
+            }}
             
-            // Expand all sections by default
-            document.addEventListener('DOMContentLoaded', function() {
-                const sections = document.querySelectorAll('.module-section');
-                sections.forEach(section => {
-                    section.classList.remove('collapsed');
-                });
-            });
+            // Remove loading bar after page load
+            window.addEventListener('load', () => {{
+                setTimeout(() => {{
+                    const loadingBar = document.querySelector('.loading-bar');
+                    if (loadingBar) {{
+                        loadingBar.style.opacity = '0';
+                        setTimeout(() => loadingBar.remove(), 500);
+                    }}
+                }}, 2000);
+            }});
         </script>
     </body>
     </html>
@@ -1324,10 +1697,11 @@ def save_html_report(data, output_dir, ai_summary=None):
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html)
-        print(f"[+] Professional HTML dashboard report saved to: {output_file}")
+        print(f"[+] Professional animated HTML dashboard saved to: {output_file}")
     except IOError as e:
         print(f"[!] Error saving HTML report: {e}")
 
+# Keep the existing AI summary function
 import groq
 from .config import get_api_key
 

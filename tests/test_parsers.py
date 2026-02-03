@@ -1,7 +1,7 @@
 import unittest
 import os
 import shutil
-from reconx.modules import nmap, subenum, dirfuzz, whatweb, nikto, ffuf
+from reconx.modules import nmap, subenum, whatweb, ffuf
 
 class TestParsers(unittest.TestCase):
 
@@ -10,9 +10,7 @@ class TestParsers(unittest.TestCase):
         os.makedirs(self.output_dir, exist_ok=True)
         self.sample_nmap_file = 'tests/sample_nmap.xml'
         self.sample_subdomains_file = 'tests/sample_subdomains.txt'
-        self.sample_dirfuzz_file = 'tests/sample_dirfuzz.txt'
         self.sample_whatweb_file = 'tests/sample_whatweb.json'
-        self.sample_nikto_file = 'tests/sample_nikto.txt'
         self.sample_ffuf_file = 'tests/sample_ffuf.json'
 
     def test_nmap_parser(self):
@@ -37,15 +35,6 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(len(parsed_data), 3)
         self.assertIn('test.example.com', parsed_data)
 
-    def test_dirfuzz_parser(self):
-        scanner = dirfuzz.DirectoryFuzzer('http://example.com', None, 10, self.output_dir)
-        with open(self.sample_dirfuzz_file, 'r') as fh:
-            output = fh.read()
-        parsed_data = scanner.parse_results(output)
-        self.assertIsNotNone(parsed_data)
-        self.assertEqual(len(parsed_data), 3)
-        self.assertIn('/admin', parsed_data)
-
     def test_whatweb_parser(self):
         scanner = whatweb.WhatWebScanner('http://example.com', self.output_dir)
         parsed_data = scanner.parse_results(self.sample_whatweb_file)
@@ -53,15 +42,6 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(len(parsed_data), 1)
         self.assertEqual(parsed_data[0]['target'], 'http://example.com')
         self.assertIn('Apache', parsed_data[0]['plugins'])
-
-    def test_nikto_parser(self):
-        scanner = nikto.NiktoScanner('http://example.com', self.output_dir)
-        with open(self.sample_nikto_file, 'r') as fh:
-            output = fh.read()
-        parsed_data = scanner.parse_results(output)
-        self.assertIsNotNone(parsed_data)
-        self.assertEqual(len(parsed_data), 3)
-        self.assertTrue(any('X-Frame-Options' in s for s in parsed_data))
 
     def test_ffuf_parser(self):
         scanner = ffuf.FfufFuzzer('http://example.com', None, 10, self.output_dir)

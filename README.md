@@ -132,21 +132,20 @@ recony/
 │   │   └── output.py              # Report generation engine
 │   ├── 📂 modules/                # Scanner modules
 │   │   ├── __init__.py
-│   │   ├── dirfuzz.py             # Directory fuzzing
-│   │   ├── ffuf.py                # Web fuzzing
-│   │   ├── nikto.py               # Vulnerability scanning
+│   │   ├── ffuf.py                # Directory fuzzing (dirfuzz)
+│   │   ├── httpx.py               # HTTP probing
+│   │   ├── lab.py                 # Lab/HTB subdomain enum (Gobuster DNS)
+│   │   ├── nuclei.py              # Template-based vuln scanning
 │   │   ├── nmap.py                # Port & service scanning
-│   │   ├── sqlmap.py              # SQL injection testing
-│   │   ├── subenum.py             # Subdomain enumeration
+│   │   ├── sqlmap.py              # SQL injection testing (conditional)
+│   │   ├── subenum.py             # Subdomain enumeration (Subfinder)
 │   │   ├── subfuzz.py             # Subdomain fuzzing
 │   │   ├── urlscan.py             # URL analysis
 │   │   └── whatweb.py             # Technology detection
 │   └── __main__.py                # CLI entrypoint
 ├── 📂 tests/                      # Unit tests
 │   ├── __init__.py
-│   ├── sample_dirfuzz.txt         # Sample directory fuzzing results
 │   ├── sample_ffuf.json           # Sample ffuf output
-│   ├── sample_nikto.txt           # Sample Nikto results
 │   ├── sample_nmap.xml            # Sample Nmap scan
 │   ├── sample_subdomains.txt      # Sample subdomain list
 │   ├── sample_whatweb.json        # Sample WhatWeb output
@@ -204,24 +203,27 @@ sudo apt update && sudo apt upgrade -y
 # Install core security tools
 sudo apt install -y \
     nmap \
-    gobuster \
     ffuf \
     whatweb \
-    nikto \
     sqlmap \
     golang-go \
     git \
     python3-pip
 ```
 
-### Step 2: Install Subfinder
+### Step 2: Install Go-based tools (Subfinder, httpx, nuclei)
 
 ```bash
-# Install Subfinder via Go
+# Install Subfinder, httpx, and nuclei via Go
 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 
 # Add Go bin to PATH (add to ~/.bashrc for persistence)
 export PATH=$PATH:$(go env GOPATH)/bin
+
+# Nuclei: update templates (run once)
+nuclei -update-templates
 ```
 
 ### Step 3: Install ReconX
@@ -288,17 +290,12 @@ reconx -t <TARGET> [OPTIONS]
 <tr>
 <td><code>--modules</code></td>
 <td>Optional</td>
-<td>Comma-separated list: <code>nmap,subenum,dirfuzz,whatweb,nikto,sqlmap</code></td>
+<td>Comma-separated list: <code>nmap,subenum,httpx,whatweb,dirfuzz,urlscan,subfuzz,nuclei</code>. Use <code>--sqlmap</code> to add SQLMap.</td>
 </tr>
 <tr>
 <td><code>--profile</code></td>
 <td>Optional</td>
 <td>Scan intensity: <code>fast</code> | <code>default</code> | <code>deep</code></td>
-</tr>
-<tr>
-<td><code>--fuzzer</code></td>
-<td>Optional</td>
-<td>Directory fuzzer selection: <code>gobuster</code> | <code>ffuf</code></td>
 </tr>
 <tr>
 <td><code>--threads</code></td>
@@ -353,7 +350,7 @@ reconx -t example.com
 # Comprehensive scan with all modules and reports
 reconx -t example.com \
     --profile default \
-    --modules nmap,subenum,dirfuzz,whatweb,nikto \
+    --modules nmap,subenum,httpx,whatweb,dirfuzz,urlscan,subfuzz,nuclei \
     --html \
     --ai-summary \
     --threads 20
@@ -375,7 +372,8 @@ reconx -t 192.168.1.0/24 \
 # Extensive reconnaissance with maximum depth
 reconx -t example.com \
     --profile deep \
-    --modules nmap,subenum,dirfuzz,whatweb,nikto,sqlmap \
+    --modules nmap,subenum,httpx,whatweb,dirfuzz,urlscan,subfuzz,nuclei \
+    --sqlmap \
     --wordlist /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt \
     --html \
     --ai-summary
@@ -386,7 +384,7 @@ reconx -t example.com \
 ```bash
 # Review commands before execution
 reconx -t example.com \
-    --modules nmap,subenum,dirfuzz \
+    --modules nmap,subenum,httpx,dirfuzz \
     --no-exec
 ```
 
@@ -395,12 +393,10 @@ reconx -t example.com \
 ```bash
 # Tailored scan with specific parameters
 reconx -t example.com \
-    --modules nmap,dirfuzz,whatweb \
-    --fuzzer ffuf \
+    --modules nmap,dirfuzz,whatweb,httpx,nuclei \
     --threads 30 \
     --wordlist /path/to/custom-wordlist.txt \
-    --out /home/user/recon-results \
-    --verbose
+    --out /home/user/recon-results
 ```
 
 ---
@@ -413,16 +409,15 @@ Each scan generates a timestamped directory containing multiple output formats:
 
 ```
 results/example.com-2025-11-14_15-30-45/
-├── 📄 reconx_results.json         # Primary aggregated data (JSON)
-├── 📄 summary.txt                 # Human-readable executive summary
+├── 📄 scan.log                    # Consolidated summary log
 ├── 🌐 report.html                 # Professional HTML report
-├── 🤖 ai_summary.txt              # AI-generated analysis
-├── 📄 nmap_quick_scan.xml         # Nmap quick scan results
-├── 📄 nmap_detailed_scan.xml      # Nmap comprehensive scan
-├── 📄 subdomains.txt              # Discovered subdomains
-├── 📄 dirfuzz.txt                 # Directory fuzzing results
-├── 📄 whatweb.json                # Technology stack detection
-└── 📄 nikto.txt                   # Web server vulnerabilities
+├── 📄 nmap.log                    # Nmap scan output
+├── 📄 subenum / lab / subfuzz     # Subdomain discovery logs
+├── 📄 httpx.log                   # HTTP probe results
+├── 📄 whatweb, dirfuzz (ffuf)     # Tech detection & directory fuzzing logs
+├── 📄 urlscan.log                 # URLScan.io payload
+├── 📄 nuclei.log                  # Nuclei findings
+└── 📄 sqlmap (conditional)        # SQLMap log if enabled
 ```
 
 ### Sample Report Preview
