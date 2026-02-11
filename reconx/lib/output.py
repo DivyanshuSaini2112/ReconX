@@ -1912,3 +1912,4 @@ def generate_ai_summary(data):
         return chat_completion.choices[0].message.content.strip()
     except Exception as e:
         return f"[bold red]Error generating AI summary with Groq: {e}[/bold red]"# type: ignore
+# type: ignore
