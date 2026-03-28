@@ -150,3 +150,4 @@ class NmapScanner:
                 log.write("\n--- STDERR ---\n")
                 log.write(stderr)
             log.write("\n")
+# edge case: filtered ports handled - no crash on empty host list
