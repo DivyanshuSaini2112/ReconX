@@ -137,3 +137,4 @@ class NucleiScanner:
 def run(target: str, output_dir: str, nuclei_args: Optional[str] = None):
     scanner = NucleiScanner(target, output_dir, nuclei_args=nuclei_args)
     return scanner.run_scan()
+# planner can now override tags via nuclei_args based on WhatWeb tech detection
