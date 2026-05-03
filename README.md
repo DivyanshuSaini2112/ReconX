@@ -630,3 +630,5 @@ Always obtain proper authorization before testing any system.
 *Built with ❤️ for the security community*
 
 </div>
+
+<!-- nexus agentic layer: see Doc/NEXUS_AGENT_PLAN.md -->
