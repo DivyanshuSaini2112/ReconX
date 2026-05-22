@@ -118,3 +118,4 @@ class HttpxScanner:
 def run(target: str, output_dir: str, httpx_args: Optional[str] = None):
     scanner = HttpxScanner(target, output_dir, httpx_args=httpx_args)
     return scanner.run_scan()
+# fix: handle empty JSON lines from non-200 probes
