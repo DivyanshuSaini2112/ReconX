@@ -92,3 +92,4 @@ def run(target, output_dir, whatweb_args=None):
     scanner = WhatWebScanner(target, output_dir, whatweb_args=whatweb_args)
     return scanner.run_scan()
 # enhanced: version extraction for CVE correlation in nexus layer
+# fix: utf-8 errors='replace' for non-ASCII response bodies
