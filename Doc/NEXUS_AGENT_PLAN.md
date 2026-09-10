@@ -792,3 +792,5 @@ datasets>=2.20.0
 
 *NEXUS is a research and educational project. All testing must be performed on systems you own or have explicit written authorization to test. The authors accept no liability for misuse.*
 
+
+<!-- v1.0 finalized 2026-09-10 -->
