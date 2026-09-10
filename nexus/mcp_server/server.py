@@ -17,7 +17,7 @@ import os
 
 from fastmcp import FastMCP
 
-from reconx.modules import dirfuzz, ffuf, nikto, nmap, sqlmap, subenum, subfuzz, urlscan, whatweb
+from reconx.modules import ffuf, httpx, lab, nmap, nuclei, sqlmap, subenum, subfuzz, urlscan, whatweb
 
 mcp = FastMCP("reconx-agent")
 
@@ -73,27 +73,46 @@ def run_whatweb(target: str, output_dir: str, timeout: int = DEFAULT_TIMEOUT) ->
 def run_dirfuzz(
     target: str,
     output_dir: str,
-    fuzzer: str = "ffuf",
+    wordlist: str = "",
+    threads: int = 10,
+    ffuf_args: str = "",
+    timeout: int = DEFAULT_TIMEOUT,
+) -> dict:
+    """Directory/file discovery via ffuf (ReconX's gobuster-based dirfuzz was retired upstream)."""
+    os.makedirs(output_dir, exist_ok=True)
+    scanner = ffuf.FfufFuzzer(target, wordlist, threads, output_dir, ffuf_args)
+    return {"module": "dirfuzz", "results": scanner.run_scan(timeout=timeout)}
+
+
+@mcp.tool
+def run_httpx(target: str, output_dir: str, httpx_args: str = "", timeout: int = DEFAULT_TIMEOUT) -> dict:
+    """Probe live hosts and collect metadata (status, title, tech) via httpx."""
+    os.makedirs(output_dir, exist_ok=True)
+    scanner = httpx.HttpxScanner(target, output_dir, httpx_args or None)
+    return {"module": "httpx", "results": scanner.run_scan(timeout=timeout)}
+
+
+@mcp.tool
+def run_nuclei(target: str, output_dir: str, nuclei_args: str = "", timeout: int = DEFAULT_TIMEOUT) -> dict:
+    """Template-based vulnerability scan via nuclei (ReconX's Nikto wrapper was retired upstream)."""
+    os.makedirs(output_dir, exist_ok=True)
+    scanner = nuclei.NucleiScanner(target, output_dir, nuclei_args or None)
+    return {"module": "nuclei", "results": scanner.run_scan(timeout=timeout)}
+
+
+@mcp.tool
+def run_lab(
+    target: str,
+    output_dir: str,
     wordlist: str = "",
     threads: int = 10,
     extra_args: str = "",
     timeout: int = DEFAULT_TIMEOUT,
 ) -> dict:
-    """Directory/file discovery via ffuf or gobuster."""
+    """Gobuster-based subdomain/DNS enumeration for internal/HTB-style lab targets."""
     os.makedirs(output_dir, exist_ok=True)
-    if fuzzer == "ffuf":
-        scanner = ffuf.FfufFuzzer(target, wordlist, threads, output_dir, extra_args)
-    else:
-        scanner = dirfuzz.DirectoryFuzzer(target, wordlist, threads, output_dir, extra_args)
-    return {"module": "dirfuzz", "results": scanner.run_scan(timeout=timeout)}
-
-
-@mcp.tool
-def run_nikto(target: str, output_dir: str, timeout: int = DEFAULT_TIMEOUT) -> dict:
-    """Web server vulnerability scan via Nikto."""
-    os.makedirs(output_dir, exist_ok=True)
-    scanner = nikto.NiktoScanner(target, output_dir)
-    return {"module": "nikto", "results": scanner.run_scan(timeout=timeout)}
+    scanner = lab.LabSubdomainScanner(target, output_dir, wordlist or None, threads, extra_args or None)
+    return {"module": "lab", "results": scanner.run_scan(timeout=timeout)}
 
 
 @mcp.tool
