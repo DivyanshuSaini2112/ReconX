@@ -11,4 +11,8 @@ results/
 tests/tmp/
 
 # Config file
+config.ini
 reconx/config.ini
+
+# Virtualenv
+.venv/

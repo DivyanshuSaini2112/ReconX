@@ -1,0 +1,16 @@
+# Additional dependencies for the NEXUS agentic layer (nexus/), on top of
+# requirements.txt. Installed in their own virtualenv (.venv/) to avoid
+# fighting the many mutually-conflicting langchain/langgraph pins that tend
+# to accumulate in a shared/global Python environment:
+#
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r requirements.txt -r requirements-nexus.txt   # Windows
+#   .venv/bin/pip install -r requirements.txt -r requirements-nexus.txt       # Linux/macOS/Kali
+#
+# Phase 0 (current): langgraph, langchain-groq, fastmcp.
+# Phase 3+ (not yet used by any code in this repo): playwright, chromadb,
+# fastapi, uvicorn, websockets — add them here as those phases land instead
+# of installing speculatively now.
+langgraph
+langchain-groq
+fastmcp
