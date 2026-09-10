@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  nexus:
+    build: ..
+    volumes:
+      - ../results:/app/results
+      - nexus-memory:/app/nexus_memory
+    environment:
+      - GROQ_API_KEY=${{GROQ_API_KEY}}
+      - GEMINI_API_KEY=${{GEMINI_API_KEY}}
+    network_mode: host
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - nexus-memory:/chroma/chroma
+
+volumes:
+  nexus-memory:

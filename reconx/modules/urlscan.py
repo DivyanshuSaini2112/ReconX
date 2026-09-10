@@ -27,16 +27,13 @@ class UrlScanScanner:
             self._log("Submitting scan to URLScan.io...")
             response = requests.post('https://urlscan.io/api/v1/scan/', headers=headers, data=json.dumps(data))
 
-            # Save the submission response for debugging
-            with open(os.path.join(self.output_dir, 'urlscan_submission.json'), 'w') as f:
-                json.dump(response.json(), f)
-
             if response.status_code != 200:
                 error_msg = f"URLScan.io API request failed with status code {response.status_code}: {response.text}"
                 self._log(f"ERROR: {error_msg}")
                 return {'error': error_msg}
 
             submit_data = response.json()
+            self._log(f"Submission response: {json.dumps(submit_data)}")
             if 'api' not in submit_data:
                 error_msg = f"Unexpected response from URLScan.io: {submit_data}"
                 self._log(f"ERROR: {error_msg}")
@@ -54,12 +51,7 @@ class UrlScanScanner:
                 if result_response.status_code == 200:
                     self._log("Results received successfully.")
                     result_data = result_response.json()
-                    output_file = os.path.join(self.output_dir, 'urlscan_results.json')
-                    with open(output_file, 'w') as f:
-                        json.dump(result_data, f, indent=4)
-
-                    # Generate the detailed HTML report
-                    self._generate_html_report(result_data)
+                    self._log(f"Result payload: {json.dumps(result_data)}")
 
                     return self.parse_results(result_data)
 
@@ -109,67 +101,3 @@ class UrlScanScanner:
     def get_command(self):
         """Returns the command that would be executed."""
         return ["requests.post('https://urlscan.io/api/v1/scan/', ...)"]
-
-    def _generate_html_report(self, data):
-        """Generates a detailed HTML report from the urlscan.io data."""
-        report_path = os.path.join(self.output_dir, 'urlscan_report.html')
-
-        html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>URLScan.io Report</title>
-            <style>
-                body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
-                h1, h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
-                .container { background: #fff; padding: 2em; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-                .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1em; }
-                .card { background: #f9f9f9; padding: 1em; border-radius: 5px; }
-                .code { background: #eee; padding: 0.5em; border-radius: 3px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-                th { background-color: #f2f2f2; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>URLScan.io Detailed Report</h1>
-        """
-
-        # Summary Section
-        if 'task' in data:
-            html += f"<h2>Summary for {data['task'].get('url', '')}</h2>"
-            html += "<div class='grid'>"
-            html += f"<div class='card'><b>Verdict:</b> {data.get('verdicts', {}).get('overall', {}).get('score', 'N/A')}</div>"
-            html += f"<div class='card'><b>Malicious:</b> {data.get('verdicts', {}).get('overall', {}).get('malicious', 'N/A')}</div>"
-            html += f"<div class='card'><b>IPs:</b> {len(data.get('lists', {}).get('ips', []))}</div>"
-            html += f"<div class='card'><b>Domains:</b> {len(data.get('lists', {}).get('domains', []))}</div>"
-            html += "</div>"
-
-        # Technologies
-        if data.get('verdicts', {}).get('overall', {}).get('brands'):
-            html += "<h2>Detected Technologies</h2><table><tr><th>Name</th><th>Categories</th></tr>"
-            for brand in data['verdicts']['overall']['brands']:
-                html += f"<tr><td>{brand.get('name', '')}</td><td>{', '.join(brand.get('categories', []))}</td></tr>"
-            html += "</table>"
-
-        # Network Requests
-        if data.get('data', {}).get('requests'):
-            html += "<h2>Network Requests</h2><table><tr><th>URL</th><th>Status</th><th>Content-Type</th></tr>"
-            for req in data['data']['requests']:
-                html += f"<tr><td class='code'>{req.get('request', {}).get('url', '')}</td><td>{req.get('response', {}).get('status', 'N/A')}</td><td>{req.get('response', {}).get('headers', {}).get('content-type', ['N/A'])[0]}</td></tr>"
-            html += "</table>"
-
-        html += """
-            </div>
-        </body>
-        </html>
-        """
-
-        try:
-            with open(report_path, 'w') as f:
-                f.write(html)
-            self._log(f"Successfully generated URLScan.io HTML report at {report_path}")
-        except IOError as e:
-            self._log(f"Error saving URLScan.io HTML report: {e}")
