@@ -15,8 +15,8 @@ console = Console()
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        prog="nexus",
-        description="NEXUS: autonomous agentic pentesting orchestrator built on ReconX.",
+        prog="reconx-agent",
+        description="ReconX Agent: autonomous agentic pentesting orchestrator for ReconX.",
         epilog="Example: python -m nexus.main -t example.com --mode standard",
     )
     parser.add_argument("-t", "--target", required=True, help="Target IP, domain, or CIDR.")
@@ -39,7 +39,7 @@ def parse_args():
 
 def confirm_consent() -> bool:
     console.print(
-        "\n[bold yellow]WARNING:[/] NEXUS performs active reconnaissance and, in later "
+        "\n[bold yellow]WARNING:[/] ReconX Agent performs active reconnaissance and, in later "
         "phases, exploitation. It is intended for authorized security testing only."
     )
     console.print("You must have explicit, written permission from the target system's owner.")
@@ -56,7 +56,7 @@ def confirm_consent() -> bool:
 def main():
     args = parse_args()
 
-    console.print(Panel.fit("--- NEXUS: Autonomous Agentic Pentesting Orchestrator ---", style="bold blue"))
+    console.print(Panel.fit("--- ReconX Agent: Autonomous Pentesting Orchestrator ---", style="bold blue"))
 
     if not confirm_consent():
         console.print("[bold red]Consent not given. Exiting.[/]")

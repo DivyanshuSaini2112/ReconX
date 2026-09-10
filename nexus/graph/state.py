@@ -1,4 +1,4 @@
-"""NEXUS shared state schema (LangGraph state + supporting models).
+"""ReconX Agent shared state schema (LangGraph state + supporting models).
 
 Phase 0 scope: only the fields actually read/written by scope_gate,
 recon_planner, and recon_dispatcher are exercised today. The remaining

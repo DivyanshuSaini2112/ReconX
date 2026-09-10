@@ -7,7 +7,7 @@ from instead of each hardcoding a provider/model string.
 
 Reuses reconx.lib.config.get_api_key so the same config.ini (with a
 GROQ_API_KEY under [API_KEYS]) that already powers `--ai-summary` also
-powers NEXUS.
+powers the ReconX Agent.
 """
 
 from langchain_groq import ChatGroq

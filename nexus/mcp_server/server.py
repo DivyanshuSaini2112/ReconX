@@ -19,7 +19,7 @@ from fastmcp import FastMCP
 
 from reconx.modules import dirfuzz, ffuf, nikto, nmap, sqlmap, subenum, subfuzz, urlscan, whatweb
 
-mcp = FastMCP("nexus-reconx")
+mcp = FastMCP("reconx-agent")
 
 DEFAULT_TIMEOUT = 600
 

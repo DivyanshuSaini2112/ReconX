@@ -1,8 +1,8 @@
 """The planner ("the brain") that decides what runs next.
 
 Phase 0 is a deterministic stub on purpose: round 1 dispatches nmap,
-round 2 stops. This is the exact Phase 0 milestone from the NEXUS build
-roadmap. Swapping this for a real LLM-driven planner (reading
+round 2 stops. This is the exact Phase 0 milestone from the ReconX Agent
+build roadmap. Swapping this for a real LLM-driven planner (reading
 state.attack_surface and reasoning about next hunters/tools) is Phase 1
 work — see nexus/gateway/llm_router.py, which is already wired for that.
 """

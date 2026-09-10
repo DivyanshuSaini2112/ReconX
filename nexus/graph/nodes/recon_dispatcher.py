@@ -17,7 +17,7 @@ from nexus.graph.nodes.scope_gate import is_in_scope
 from nexus.graph.state import AttackSurface, NEXUSState
 from nexus.mcp_server.server import mcp
 
-# NEXUS modes map onto ReconX's existing nmap profiles.
+# ReconX Agent modes map onto ReconX's existing nmap profiles.
 MODE_TO_NMAP_PROFILE = {
     "fast": "fast",
     "standard": "default",
