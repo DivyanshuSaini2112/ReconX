@@ -1,101 +1,634 @@
-# ReconX: Automated Reconnaissance Tool
+<div align="center">
 
-ReconX is a CLI-first reconnaissance tool for Kali Linux that performs an automated initial reconnaissance sweep on a single target (IP, CIDR, or domain) and outputs aggregated, easy-to-parse results and an initial attack vector summary.
+<!-- Banner -->
+<img src="./reconx-github-banner.svg" alt="ReconX Banner" width="100%" />
 
-## Legal Disclaimer
+# ReconX
 
-> This tool is intended for authorized security testing and educational purposes only. Unauthorized scanning of networks is illegal. The author is not responsible for any misuse or damage caused by this tool. By using this tool, you agree to the terms of the MIT License included in this repository.
+### ⚡ Next-Generation Automated Reconnaissance Framework
 
-## Installation
+<!-- Badges -->
+<img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge&logo=semver&logoColor=white" alt="Version">
+<img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+<img src="https://img.shields.io/badge/Platform-Kali%20Linux-557C94?style=for-the-badge&logo=kalilinux&logoColor=white" alt="Platform">
+<img src="https://img.shields.io/badge/License-MIT-00C853?style=for-the-badge&logo=opensourceinitiative&logoColor=white" alt="License">
+
+<br/>
+
+<!-- Social Badges -->
+<img src="https://img.shields.io/github/stars/DivyanshuSaini2112/recony?style=social" alt="Stars">
+<img src="https://img.shields.io/github/forks/DivyanshuSaini2112/recony?style=social" alt="Forks">
+
+---
+
+### **[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Documentation](#-documentation) • [Contributing](#-contributing)**
+
+---
+
+</div>
+
+
+## 📋 Overview
+
+**ReconX** is an enterprise-grade, CLI-first reconnaissance automation toolkit designed for security professionals and penetration testers. It orchestrates multiple industry-standard security tools into a unified workflow, producing comprehensive, structured reports in multiple formats.
+
+```ascii
+┌─────────────────────────────────────────────────────────────┐
+│  ReconX Pipeline                                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Target Input  →  Multi-Tool Scanning  →  Data Aggregation  │
+│       ↓                    ↓                      ↓         │
+│   IP/Domain        Parallel Execution         JSON/HTML     │
+│   CIDR Range       7+ Security Tools           Reports      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+> ⚠️ **Legal Notice**: This tool is intended exclusively for authorized security assessments and educational purposes. Unauthorized network reconnaissance or penetration testing is illegal. Only use ReconX on systems you own or have explicit written permission to test.
+
+---
+
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🔧 **Core Capabilities**
+
+- **Multi-Tool Integration**  
+  Seamlessly orchestrates Nmap, Subfinder, Gobuster, ffuf, WhatWeb, Nikto, and SQLMap
+
+- **Intelligent Automation**  
+  Parallel execution with smart dependency management
+
+- **Flexible Profiles**  
+  Fast, default, and deep scanning modes for different scenarios
+
+- **Modular Design**  
+  Enable/disable specific modules based on engagement scope
+
+</td>
+<td width="50%">
+
+### 📊 **Advanced Features**
+
+- **Multi-Format Reports**  
+  JSON, plain text, and professional HTML reports
+
+- **AI-Powered Analysis**  
+  Optional local AI summaries via Ollama integration
+
+- **Preview Mode**  
+  Dry-run capability to review commands before execution
+
+- **Custom Configuration**  
+  Flexible wordlists, thread counts, and API integration
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        ReconX Core                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
+│  │   Nmap   │  │ Subfinder│  │ Gobuster │  │   ffuf   │     │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │
+│       │             │             │             │           │
+│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐     │
+│  │ WhatWeb  │  │  Nikto   │  │  SQLMap  │  │ URLScan  │     │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │
+│       │             │             │             │           │
+│       └─────────────┴─────────────┴─────────────┘           │
+│                          ↓                                  │
+│              ┌───────────────────────┐                      │
+│              │   Parser & Aggregator │                      │
+│              └───────────┬───────────┘                      │
+│                          ↓                                  │
+│              ┌───────────────────────┐                      │
+│              │   Report Generator    │                      │
+│              │  JSON | TXT | HTML    │                      │
+│              └───────────────────────┘                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 📁 Project Structure
+
+```
+recony/
+├── 📂 reconx/
+│   ├── 📂 lib/
+│   │   ├── __init__.py
+│   │   ├── config.py              # Configuration handler
+│   │   └── output.py              # Report generation engine
+│   ├── 📂 modules/                # Scanner modules
+│   │   ├── __init__.py
+│   │   ├── ffuf.py                # Directory fuzzing (dirfuzz)
+│   │   ├── httpx.py               # HTTP probing
+│   │   ├── lab.py                 # Lab/HTB subdomain enum (Gobuster DNS)
+│   │   ├── nuclei.py              # Template-based vuln scanning
+│   │   ├── nmap.py                # Port & service scanning
+│   │   ├── sqlmap.py              # SQL injection testing (conditional)
+│   │   ├── subenum.py             # Subdomain enumeration (Subfinder)
+│   │   ├── subfuzz.py             # Subdomain fuzzing
+│   │   ├── urlscan.py             # URL analysis
+│   │   └── whatweb.py             # Technology detection
+│   └── __main__.py                # CLI entrypoint
+├── 📂 tests/                      # Unit tests
+│   ├── __init__.py
+│   ├── sample_ffuf.json           # Sample ffuf output
+│   ├── sample_nmap.xml            # Sample Nmap scan
+│   ├── sample_subdomains.txt      # Sample subdomain list
+│   ├── sample_whatweb.json        # Sample WhatWeb output
+│   └── test_parsers.py            # Parser unit tests
+├── 📄 .gitignore
+├── 📄 LICENSE
+├── 📄 README.md
+├── 📄 config.ini.example          # API keys configuration
+├── 📄 reconx-github-banner.svg    # Repository banner
+├── 📄 requirements.txt
+└── 📄 setup.py
+```
+
+---
+
+## 🚀 Installation
 
 ### Prerequisites
 
-ReconX is designed to run on Kali Linux and relies on the following tools being installed and available in your PATH:
+<table>
+<tr>
+<td width="33%">
 
-- [Nmap](https://nmap.org/)
-- [Subfinder](https://github.com/projectdiscovery/subfinder)
-- [Gobuster](https://github.com/OJ/gobuster)
-- [ffuf](https://github.com/ffuf/ffuf)
-- [WhatWeb](https://github.com/urbanadventurer/WhatWeb)
-- [Nikto](https://github.com/sullo/nikto)
-- [SQLMap](https://sqlmap.org/)
+**Operating System**
+- Kali Linux (recommended)
+- Ubuntu 20.04+
+- Debian 11+
 
-You can install these tools on Kali Linux using the following command:
+</td>
+<td width="33%">
+
+**Python Environment**
+- Python 3.8+
+- pip package manager
+- virtualenv (optional)
+
+</td>
+<td width="33%">
+
+**System Tools**
+- Nmap 7.80+
+- Go 1.16+ (for Subfinder)
+- Internet connection
+
+</td>
+</tr>
+</table>
+
+### Step 1: Install System Dependencies
 
 ```bash
-sudo apt-get update && sudo apt-get install nmap subfinder gobuster ffuf whatweb nikto sqlmap
+# Update package lists
+sudo apt update && sudo apt upgrade -y
+
+# Install core security tools
+sudo apt install -y \
+    nmap \
+    ffuf \
+    whatweb \
+    sqlmap \
+    golang-go \
+    git \
+    python3-pip
 ```
 
-### Installation from Source
+### Step 2: Install Go-based tools (Subfinder, httpx, nuclei)
 
-1.  Clone this repository:
-    ```bash
-    git clone https://github.com/your-username/reconx.git
-    cd reconx
-    ```
+```bash
+# Install Subfinder, httpx, and nuclei via Go
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 
-2.  Install the Python dependencies:
-    ```bash
-    pip install .
-    ```
+# Add Go bin to PATH (add to ~/.bashrc for persistence)
+export PATH=$PATH:$(go env GOPATH)/bin
 
-### AI Summary Setup (Optional)
-
-The `--ai-summary` feature uses a local AI model through [Ollama](https://ollama.ai/). This is **100% free, private, and works offline.**
-
->**Important:** `reconx` uses your **local** installation of Ollama. It does not connect to the Ollama cloud service. You do not need an online account, API keys, or a paid subscription to use this feature.
-
-1.  **Install Ollama:** Follow the official instructions to download and install Ollama on your system.
-2.  **Download a Model:** Pull a model for the summary generation. `llama3` is recommended:
-    ```bash
-    ollama pull llama3
-    ```
-3.  **Run the Ollama Server:** Before using the `--ai-summary` flag, make sure the Ollama server is running in the background.
-
-## Usage
-
-```
-usage: reconx [-h] -t TARGET [--modules MODULES] [--profile {fast,default,deep}] [--threads THREADS] [--wordlist WORDLIST]
-              [--fuzzer {gobuster,ffuf}] [--out OUT] [--html] [--ai-summary] [--nmap-args NMAP_ARGS]
-              [--gobuster-args GOBUSTER_ARGS] [--ffuf-args FFuf_ARGS] [--sqlmap] [--no-exec]
-
-A CLI-first reconnaissance tool for Kali Linux.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -t TARGET, --target TARGET
-                        The target IP, domain, or CIDR.
-  --modules MODULES     Comma-separated list of modules to run (e.g., nmap,subenum,dirfuzz).
-  --profile {fast,default,deep}
-                        Scan profile (fast, default, deep).
-  --threads THREADS     Number of concurrent threads for fuzzing/discovery.
-  --wordlist WORDLIST   Path to a custom wordlist for directory fuzzing.
-  --fuzzer {gobuster,ffuf}
-                        Choose the directory fuzzer to use.
-  --out OUT             Directory to save results to.
-  --html                Generate an HTML report.
-  --ai-summary          Generate a summary using a local Ollama model.
-  --nmap-args NMAP_ARGS
-                        Custom arguments for Nmap.
-  --gobuster-args GOBUSTER_ARGS
-                        Custom arguments for Gobuster.
-  --ffuf-args FFuf_ARGS
-                        Custom arguments for ffuf.
-  --sqlmap              Explicitly enable the SQLMap module.
-  --no-exec             Print planned commands without executing them.
-
-Example: reconx -t example.com --profile default --modules nmap,subenum,dirfuzz --fuzzer ffuf --html --ai-summary
+# Nuclei: update templates (run once)
+nuclei -update-templates
 ```
 
-## Output
+### Step 3: Install ReconX
 
-ReconX produces the following outputs in a timestamped directory:
+```bash
+# Clone the repository
+git clone https://github.com/DivyanshuSaini2112/recony.git
 
--   `reconx_results.json`: A JSON file containing all the aggregated results.
--   `summary.txt`: A plain-text summary of the findings.
--   `report.html`: An HTML report of the findings (if `--html` is specified).
--   Raw output files from each of the tools (`nmap_scan.xml`, `subdomains.txt`, etc.).
+# Navigate to directory
+cd recony
 
-## License
+# Install ReconX and Python dependencies
+pip install .
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+# Verify installation
+reconx --help
+```
+
+### Step 4: Configure API Keys (Optional)
+
+For enhanced functionality with URLScan and other services:
+
+```bash
+# Copy example configuration
+cp config.ini.example config.ini
+
+# Edit with your favorite editor
+nano config.ini
+```
+
+**config.ini structure:**
+```ini
+[API_KEYS]
+URLSCAN_API_KEY = YOUR_URLSCAN_API_KEY
+GROQ_API_KEY = YOUR_GROQ_API_KEY
+```
+
+---
+
+## 💻 Usage
+
+### Basic Command Structure
+
+```bash
+reconx -t <TARGET> [OPTIONS]
+```
+
+### Command-Line Arguments
+
+<table>
+<thead>
+<tr>
+<th width="25%">Argument</th>
+<th width="15%">Type</th>
+<th width="60%">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-t, --target</code></td>
+<td>Required</td>
+<td>Target specification: IP address, domain, or CIDR range</td>
+</tr>
+<tr>
+<td><code>--modules</code></td>
+<td>Optional</td>
+<td>Comma-separated list: <code>nmap,subenum,httpx,whatweb,dirfuzz,urlscan,subfuzz,nuclei</code>. Use <code>--sqlmap</code> to add SQLMap.</td>
+</tr>
+<tr>
+<td><code>--profile</code></td>
+<td>Optional</td>
+<td>Scan intensity: <code>fast</code> | <code>default</code> | <code>deep</code></td>
+</tr>
+<tr>
+<td><code>--threads</code></td>
+<td>Optional</td>
+<td>Number of concurrent threads (default: 10)</td>
+</tr>
+<tr>
+<td><code>--wordlist</code></td>
+<td>Optional</td>
+<td>Custom wordlist path for directory fuzzing</td>
+</tr>
+<tr>
+<td><code>--out</code></td>
+<td>Optional</td>
+<td>Output directory (default: <code>./results</code>)</td>
+</tr>
+<tr>
+<td><code>--html</code></td>
+<td>Flag</td>
+<td>Generate professional HTML report</td>
+</tr>
+<tr>
+<td><code>--ai-summary</code></td>
+<td>Flag</td>
+<td>Generate AI-powered analysis (requires Ollama)</td>
+</tr>
+<tr>
+<td><code>--no-exec</code></td>
+<td>Flag</td>
+<td>Preview mode: display commands without executing</td>
+</tr>
+<tr>
+<td><code>-v, --verbose</code></td>
+<td>Flag</td>
+<td>Enable verbose output</td>
+</tr>
+</tbody>
+</table>
+
+### 📚 Usage Examples
+
+#### Quick Start
+
+```bash
+# Basic reconnaissance scan
+reconx -t example.com
+```
+
+#### Full Assessment
+
+```bash
+# Comprehensive scan with all modules and reports
+reconx -t example.com \
+    --profile default \
+    --modules nmap,subenum,httpx,whatweb,dirfuzz,urlscan,subfuzz,nuclei \
+    --html \
+    --ai-summary \
+    --threads 20
+```
+
+#### Fast Scan
+
+```bash
+# Rapid assessment with essential modules
+reconx -t 192.168.1.0/24 \
+    --profile fast \
+    --modules nmap,dirfuzz \
+    --threads 50
+```
+
+#### Deep Dive
+
+```bash
+# Extensive reconnaissance with maximum depth
+reconx -t example.com \
+    --profile deep \
+    --modules nmap,subenum,httpx,whatweb,dirfuzz,urlscan,subfuzz,nuclei \
+    --sqlmap \
+    --wordlist /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt \
+    --html \
+    --ai-summary
+```
+
+#### Preview Mode
+
+```bash
+# Review commands before execution
+reconx -t example.com \
+    --modules nmap,subenum,httpx,dirfuzz \
+    --no-exec
+```
+
+#### Custom Configuration
+
+```bash
+# Tailored scan with specific parameters
+reconx -t example.com \
+    --modules nmap,dirfuzz,whatweb,httpx,nuclei \
+    --threads 30 \
+    --wordlist /path/to/custom-wordlist.txt \
+    --out /home/user/recon-results
+```
+
+---
+
+## 📊 Output & Reports
+
+### Report Structure
+
+Each scan generates a timestamped directory containing multiple output formats:
+
+```
+results/example.com-2025-11-14_15-30-45/
+├── 📄 scan.log                    # Consolidated summary log
+├── 🌐 report.html                 # Professional HTML report
+├── 📄 nmap.log                    # Nmap scan output
+├── 📄 subenum / lab / subfuzz     # Subdomain discovery logs
+├── 📄 httpx.log                   # HTTP probe results
+├── 📄 whatweb, dirfuzz (ffuf)     # Tech detection & directory fuzzing logs
+├── 📄 urlscan.log                 # URLScan.io payload
+├── 📄 nuclei.log                  # Nuclei findings
+└── 📄 sqlmap (conditional)        # SQLMap log if enabled
+```
+
+### Sample Report Preview
+
+**summary.txt:**
+```
+═══════════════════════════════════════════════════════════
+                    ReconX Scan Summary
+═══════════════════════════════════════════════════════════
+
+Target:         example.com
+Scan Date:      2025-11-14 15:30:45
+Profile:        default
+Duration:       12m 34s
+
+─────────────────────────────────────────────────────────────
+📊 Findings Overview
+─────────────────────────────────────────────────────────────
+
+Open Ports:     22/tcp, 80/tcp, 443/tcp
+Subdomains:     12 discovered
+Directories:    47 accessible paths found
+Technologies:   Apache 2.4.52, PHP 8.1, MySQL
+
+─────────────────────────────────────────────────────────────
+🔍 Key Discoveries
+─────────────────────────────────────────────────────────────
+
+[+] Port 443: TLS certificate valid until 2026-05-15
+[+] Subdomain: admin.example.com (high priority)
+[+] Directory: /api/v1/ (200 OK)
+[!] Nikto: Outdated Apache version detected
+```
+
+---
+
+## 🔄 Workflow & Methodology
+
+```mermaid
+graph TD
+    A[User Input] -->|Target & Config| B[ReconX Core]
+    B --> C{Profile Selection}
+    C -->|Fast| D[Quick Scan Modules]
+    C -->|Default| E[Standard Modules]
+    C -->|Deep| F[All Modules + Extended]
+    
+    D & E & F --> G[Parallel Execution]
+    G --> H[Nmap Scanning]
+    G --> I[Subdomain Enumeration]
+    G --> J[Directory Fuzzing]
+    G --> K[Tech Detection]
+    
+    H & I & J & K --> L[Data Parser]
+    L --> M[Result Aggregator]
+    M --> N{Output Format}
+    N --> O[JSON Report]
+    N --> P[Text Summary]
+    N --> Q[HTML Report]
+    N --> R[AI Analysis]
+    
+    O & P & Q & R --> S[Final Deliverable]
+```
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+### Running Tests
+
+```bash
+# Run all unit tests
+python -m unittest discover -v
+
+# Run with pytest (if installed)
+pytest -v
+
+# Run with coverage report
+coverage run -m pytest
+coverage report -m
+```
+
+### Test Coverage
+
+- ✅ Module initialization
+- ✅ Command generation
+- ✅ Output parsing
+- ✅ Error handling
+- ✅ Configuration validation
+- ✅ Report generation
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+### Contribution Workflow
+
+1. **Fork** the repository
+2. **Create** a feature branch  
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. **Develop** your feature with tests
+4. **Commit** your changes  
+   ```bash
+   git commit -m 'Add amazing feature'
+   ```
+5. **Push** to your branch  
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+6. **Open** a Pull Request
+
+### Development Guidelines
+
+- Follow PEP 8 style guide for Python code
+- Add unit tests for new features
+- Update documentation for API changes
+- Ensure all tests pass before submitting PR
+- Write clear, descriptive commit messages
+
+### Areas for Contribution
+
+- 🐛 Bug fixes and improvements
+- 📝 Documentation enhancements
+- 🔧 New scanner modules
+- 🎨 UI/UX improvements
+- 🌐 Internationalization
+- 🧪 Test coverage expansion
+
+---
+
+## 🙏 Acknowledgments
+
+ReconX stands on the shoulders of giants. Special thanks to:
+
+<table>
+<tr>
+<td width="50%">
+
+**Security Tools**
+- **Nmap** - Gordon "Fyodor" Lyon
+- **Subfinder** - ProjectDiscovery Team
+- **Gobuster** - OJ Reeves
+- **ffuf** - Joona Hoikkala
+
+</td>
+<td width="50%">
+
+**Additional Tools**
+- **WhatWeb** - Andrew Horton
+- **Nikto** - Chris Sullo & David Lodge
+- **SQLMap** - Bernardo Damele & Miroslav Stampar
+- **Ollama** - Ollama Team
+
+</td>
+</tr>
+</table>
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for full details.
+
+```
+MIT License
+
+Copyright (c) 2025 Divyanshu Saini
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files...
+```
+
+---
+
+## 📞 Contact & Support
+
+<div align="center">
+
+**Developer**: [Divyanshu Saini](https://github.com/DivyanshuSaini2112)
+
+[![GitHub](https://img.shields.io/badge/GitHub-DivyanshuSaini2112-181717?style=for-the-badge&logo=github)](https://github.com/DivyanshuSaini2112)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/divyanshusaini2112)
+[![Twitter](https://img.shields.io/badge/Twitter-Follow-1DA1F2?style=for-the-badge&logo=twitter)](https://x.com/DivyanshuS72153)
+
+### Support the Project
+
+If ReconX has been valuable to your security assessments, consider:
+
+⭐ **Star** the repository  
+🐛 **Report** issues  
+🤝 **Contribute** code  
+📢 **Share** with the community
+
+</div>
+
+---
+
+<div align="center">
+
+### ⚡ Happy Hacking! ⚡
+
+**Remember: With great power comes great responsibility.**  
+Always obtain proper authorization before testing any system.
+
+---
+
+*Built with ❤️ for the security community*
+
+</div>
+
+<!-- nexus agentic layer: see Doc/NEXUS_AGENT_PLAN.md -->
